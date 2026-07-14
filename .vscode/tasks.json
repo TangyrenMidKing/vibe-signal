@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile-connector",
+      "type": "npm",
+      "script": "compile",
+      "path": "connector/",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    }
+  ]
+}

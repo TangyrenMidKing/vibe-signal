@@ -1,0 +1,12 @@
+node_modules/
+out/
+*.vsix
+.DS_Store
+*.xcuserdata
+*.xcworkspace/xcuserdata
+DerivedData/
+.build/
+AgentPulse.xcodeproj/
+app/AgentPulse.xcodeproj/
+.env
+*.log

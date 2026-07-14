@@ -1,0 +1,118 @@
+{
+  "name": "agentpulse",
+  "displayName": "AgentPulse",
+  "description": "Keep your AI coding agent connected to your Apple Watch and iPhone.",
+  "version": "0.1.0",
+  "publisher": "agentpulse",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:agentpulse.sidebar",
+    "onCommand:agentpulse.toggle",
+    "onCommand:agentpulse.focusSidebar"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentpulse",
+          "title": "AgentPulse",
+          "icon": "media/pulse.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentpulse": [
+        {
+          "type": "webview",
+          "id": "agentpulse.sidebar",
+          "name": "Connector",
+          "icon": "media/pulse.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agentpulse.toggle",
+        "title": "AgentPulse: Toggle Connector"
+      },
+      {
+        "command": "agentpulse.enable",
+        "title": "AgentPulse: Enable Connector"
+      },
+      {
+        "command": "agentpulse.disable",
+        "title": "AgentPulse: Disable Connector"
+      },
+      {
+        "command": "agentpulse.focusSidebar",
+        "title": "AgentPulse: Open Sidebar"
+      },
+      {
+        "command": "agentpulse.pairDevice",
+        "title": "AgentPulse: Pair Device"
+      },
+      {
+        "command": "agentpulse.setupHooks",
+        "title": "AgentPulse: Setup Codex Hooks"
+      },
+      {
+        "command": "agentpulse.simulateEvent",
+        "title": "AgentPulse: Simulate Event"
+      },
+      {
+        "command": "agentpulse.showStatus",
+        "title": "AgentPulse: Show Status"
+      },
+      {
+        "command": "agentpulse.copyPairingInfo",
+        "title": "AgentPulse: Copy Pairing Info"
+      },
+      {
+        "command": "agentpulse.rotateToken",
+        "title": "AgentPulse: Rotate Token"
+      }
+    ],
+    "configuration": {
+      "title": "AgentPulse",
+      "properties": {
+        "agentpulse.port": {
+          "type": "number",
+          "default": 8787,
+          "description": "LAN WebSocket / local HTTP port."
+        },
+        "agentpulse.permissionTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "description": "How long hooks wait for Approve/Deny from the phone."
+        },
+        "agentpulse.stopTimeoutMs": {
+          "type": "number",
+          "default": 60000,
+          "description": "How long hooks wait for Continue/voice after a turn completes."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.3"
+  }
+}

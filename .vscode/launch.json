@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run AgentPulse Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/connector"
+      ],
+      "outFiles": ["${workspaceFolder}/connector/out/**/*.js"],
+      "preLaunchTask": "compile-connector"
+    }
+  ]
+}

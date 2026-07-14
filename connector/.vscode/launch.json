@@ -1,0 +1,14 @@
+# AgentPulse connector — open this folder and press F5 to launch the Extension Development Host.
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run AgentPulse Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile"
+    }
+  ]
+}
