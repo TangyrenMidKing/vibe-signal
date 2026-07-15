@@ -1,17 +1,31 @@
 #!/usr/bin/env node
 /**
- * AgentPulse Codex lifecycle hook.
+ * Vibe Signal Codex lifecycle hook.
  * Reads event JSON from stdin, POSTs to the local connector, and for
  * PermissionRequest / Stop long-polls for a phone/watch decision.
  *
  * Usage: node hook.js --port 8787
- * Marker: agentpulse-hook (for installer filtering)
+ * Logs: ~/.agentpulse/hook.log
  */
 "use strict";
 
 const http = require("http");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 
-const AGENTPULSE_MARKER = "agentpulse-hook"; // eslint-disable-line no-unused-vars
+const LOG_DIR = path.join(os.homedir(), ".agentpulse");
+const LOG_FILE = path.join(LOG_DIR, "hook.log");
+
+function log(line) {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+    const stamp = new Date().toISOString();
+    fs.appendFileSync(LOG_FILE, `[${stamp}] ${line}\n`, "utf8");
+  } catch {
+    // ignore
+  }
+}
 
 function parseArgs(argv) {
   let port = 8787;
@@ -20,12 +34,8 @@ function parseArgs(argv) {
       port = Number(argv[++i]);
     }
   }
-  // Fall back to ~/.agentpulse/port if present
   try {
-    const fs = require("fs");
-    const os = require("os");
-    const path = require("path");
-    const p = path.join(os.homedir(), ".agentpulse", "port");
+    const p = path.join(LOG_DIR, "port");
     if (fs.existsSync(p)) {
       const n = Number(fs.readFileSync(p, "utf8").trim());
       if (!Number.isNaN(n) && n > 0) port = n;
@@ -56,14 +66,14 @@ function readStdin() {
   });
 }
 
-function request(port, method, path, body, timeoutMs) {
+function request(port, method, reqPath, body, timeoutMs) {
   return new Promise((resolve, reject) => {
     const payload = body ? Buffer.from(JSON.stringify(body), "utf8") : null;
     const req = http.request(
       {
         host: "127.0.0.1",
         port,
-        path,
+        path: reqPath,
         method,
         timeout: timeoutMs,
         headers: payload
@@ -104,20 +114,27 @@ function writeStdout(obj) {
 
 async function main() {
   const { port } = parseArgs(process.argv);
+  log(`start port=${port} argv=${JSON.stringify(process.argv)}`);
+
   let event;
   try {
     event = await readStdin();
-  } catch {
+  } catch (err) {
+    log(`stdin parse error: ${err && err.message ? err.message : err}`);
     process.exit(0);
   }
 
-  const hookEvent = String(event.hook_event_name || "");
+  const hookEvent = String(
+    event.hook_event_name || event.hookEventName || event.type || ""
+  );
   const turnId = String(event.turn_id || event.session_id || "default");
+  log(`event=${hookEvent || "(empty)"} keys=${Object.keys(event).join(",")}`);
 
   try {
-    await request(port, "POST", "/hook/event", event, 5_000);
-  } catch {
-    // Connector not running — no-op so Codex continues
+    const res = await request(port, "POST", "/hook/event", event, 5_000);
+    log(`POST /hook/event -> ${res.status} ${JSON.stringify(res.json)}`);
+  } catch (err) {
+    log(`POST failed: ${err && err.message ? err.message : err}`);
     process.exit(0);
   }
 
@@ -130,6 +147,7 @@ async function main() {
         null,
         125_000
       );
+      log(`permission decision=${JSON.stringify(json)}`);
       if (json.decision === "allow") {
         writeStdout({
           hookSpecificOutput: {
@@ -143,14 +161,13 @@ async function main() {
             hookEventName: "PermissionRequest",
             decision: {
               behavior: "deny",
-              message: json.message || "Denied from AgentPulse",
+              message: json.message || "Denied from Vibe Signal",
             },
           },
         });
       }
-      // timeout → silent exit
-    } catch {
-      // silent
+    } catch (err) {
+      log(`permission wait failed: ${err && err.message ? err.message : err}`);
     }
     process.exit(0);
   }
@@ -164,23 +181,23 @@ async function main() {
         null,
         65_000
       );
+      log(`stop decision=${JSON.stringify(json)}`);
       if (json.decision === "continue" && json.reason) {
         writeStdout({
           decision: "block",
           reason: String(json.reason),
         });
       }
-    } catch {
-      // silent
+    } catch (err) {
+      log(`stop wait failed: ${err && err.message ? err.message : err}`);
     }
     process.exit(0);
   }
 
-  // Other events: already POSTed; exit cleanly (Stop hooks require JSON, others OK empty)
-  if (hookEvent === "Stop" || hookEvent === "SubagentStop") {
-    writeStdout({});
-  }
   process.exit(0);
 }
 
-main().catch(() => process.exit(0));
+main().catch((err) => {
+  log(`fatal: ${err && err.message ? err.message : err}`);
+  process.exit(0);
+});

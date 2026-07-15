@@ -1,4 +1,4 @@
-# AgentPulse Protocol v0.1
+# Vibe Signal Protocol v0.1
 
 Single source of truth for WebSocket messages and the local hook HTTP contract between the VS Code connector and clients (iPhone, hook scripts, simulators).
 
@@ -47,10 +47,14 @@ ws://<lan-ip>:<port>/?token=<pairing-token>
   "detail": "Human-readable summary",
   "sessionId": "optional-codex-session-id",
   "turnId": "optional-turn-id",
+  "project": "Jareturn",
+  "repo": "owner/jareturn",
+  "cwd": "D:\\\\Code\\\\Jareturn",
   "ts": 1710000000000
 }
 ```
 
+`project` is typically the workspace / folder name. `repo` is the git remote identity (`owner/name`) when available, otherwise the git root folder name.
 **Ping**:
 
 ```json
@@ -96,7 +100,7 @@ Scanned by the iPhone app. JSON string:
 ```json
 {
   "v": 1,
-  "name": "AgentPulse",
+  "name": "Vibe Signal",
   "host": "192.168.1.42",
   "port": 8787,
   "token": "hex-or-base64url-secret"
@@ -123,7 +127,7 @@ Response:
 
 The connector maps `hook_event_name` to agent state:
 
-| Codex event          | AgentPulse state |
+| Codex event          | Vibe Signal state |
 |----------------------|------------------|
 | `SessionStart`       | `working`        |
 | `UserPromptSubmit`   | `working`        |
@@ -204,7 +208,7 @@ or
     "hookEventName": "PermissionRequest",
     "decision": {
       "behavior": "deny",
-      "message": "Denied from AgentPulse"
+      "message": "Denied from Vibe Signal"
     }
   }
 }

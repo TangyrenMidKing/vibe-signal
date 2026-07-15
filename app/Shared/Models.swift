@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 public enum AgentState: String, Codable, Sendable, CaseIterable {
     case idle
@@ -15,16 +14,6 @@ public enum AgentState: String, Codable, Sendable, CaseIterable {
         case .waiting: return "Waiting"
         case .completed: return "Completed"
         case .error: return "Error"
-        }
-    }
-
-    public var color: Color {
-        switch self {
-        case .idle: return Color.gray
-        case .working: return Color.red
-        case .waiting: return Color.yellow
-        case .completed: return Color.green
-        case .error: return Color.orange
         }
     }
 }
@@ -43,6 +32,9 @@ public struct StateSnapshot: Codable, Equatable, Sendable {
     public var detail: String
     public var sessionId: String?
     public var turnId: String?
+    public var project: String?
+    public var repo: String?
+    public var cwd: String?
     public var ts: Int64
 
     public init(
@@ -51,6 +43,9 @@ public struct StateSnapshot: Codable, Equatable, Sendable {
         detail: String,
         sessionId: String? = nil,
         turnId: String? = nil,
+        project: String? = nil,
+        repo: String? = nil,
+        cwd: String? = nil,
         ts: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
     ) {
         self.type = type
@@ -58,6 +53,9 @@ public struct StateSnapshot: Codable, Equatable, Sendable {
         self.detail = detail
         self.sessionId = sessionId
         self.turnId = turnId
+        self.project = project
+        self.repo = repo
+        self.cwd = cwd
         self.ts = ts
     }
 }

@@ -1,8 +1,8 @@
-# AgentPulse
+# Vibe Signal
 
 > Let your AI coding agent stay connected when you leave the desk.
 
-**AgentPulse** is a companion system for AI coding agents. A VS Code extension watches [Codex](https://github.com/openai/codex) via lifecycle hooks, pushes live status over the local Wi‑Fi to your iPhone, and mirrors it to Apple Watch with haptics and Approve / Continue / voice controls.
+**Vibe Signal** is a companion system for AI coding agents. A VS Code extension watches [Codex](https://github.com/openai/codex) via lifecycle hooks, pushes live status over the local Wi‑Fi to your iPhone, and mirrors it to Apple Watch with haptics and Approve / Continue / voice controls.
 
 ```
 Codex CLI ──hooks──► VS Code Extension (connector)
@@ -56,11 +56,11 @@ In VS Code: **Extensions → … → Install from VSIX…** after packaging, or 
 
 1. Open the `connector` folder in VS Code
 2. Press `F5` (Run Extension)
-3. In the Extension Development Host, confirm the status bar shows `AgentPulse: idle`
+3. In the Extension Development Host, confirm the status bar shows `Vibe Signal: idle`
 
 ### Sidebar UI
 
-Click the **AgentPulse** pulse icon in the Activity Bar:
+Click the **Vibe Signal** pulse icon in the Activity Bar:
 
 - Toggle **Connector On/Off** (server only listens when On)
 - Live state, detail, client count, host:port, token, health URL
@@ -72,13 +72,13 @@ Status bar shows Off / current state; click it to open the sidebar.
 
 | Command | Purpose |
 |---------|---------|
-| **AgentPulse: Toggle Connector** | Enable / disable the LAN server |
-| **AgentPulse: Open Sidebar** | Focus the AgentPulse panel |
-| **AgentPulse: Pair Device** | QR webview for iPhone |
-| **AgentPulse: Setup Codex Hooks** | Merge hooks into `~/.codex/hooks.json` |
-| **AgentPulse: Simulate Event** | Drive states without Codex |
-| **AgentPulse: Copy Pairing Info** | Copy host/port/token JSON |
-| **AgentPulse: Show Status** | Modal status dump |
+| **Vibe Signal: Toggle Connector** | Enable / disable the LAN server |
+| **Vibe Signal: Open Sidebar** | Focus the Vibe Signal panel |
+| **Vibe Signal: Pair Device** | QR webview for iPhone |
+| **Vibe Signal: Setup Codex Hooks** | Merge hooks into `~/.codex/hooks.json` |
+| **Vibe Signal: Simulate Event** | Drive states without Codex |
+| **Vibe Signal: Copy Pairing Info** | Copy host/port/token JSON |
+| **Vibe Signal: Show Status** | Modal status dump |
 
 Settings (`agentpulse.*`):
 
@@ -102,9 +102,9 @@ node scripts/ws-client.js 127.0.0.1 8787 test-token-mvp
 ## 2. Wire Codex hooks
 
 1. Start the extension (so the port is listening).
-2. Run **AgentPulse: Setup Codex Hooks**.
-3. This copies `hooks/hook.js` → `~/.agentpulse/hook.js` and merges AgentPulse entries into `~/.codex/hooks.json`.
-4. In Codex CLI, run **`/hooks`**, review, and **trust** the AgentPulse command hooks.
+2. Run **Vibe Signal: Setup Codex Hooks**.
+3. This copies `hooks/hook.js` → `~/.agentpulse/hook.js` and merges Vibe Signal entries into `~/.codex/hooks.json`.
+4. In Codex CLI, run **`/hooks`**, review, and **trust** the Vibe Signal command hooks.
 5. Start a Codex turn — status should move to **working**, approvals to **waiting**, finish to **completed**.
 
 Without trust, Codex skips the hooks silently.
@@ -124,19 +124,19 @@ Sources live under [`app/`](app/). They must be compiled on a Mac with Xcode 15+
 brew install xcodegen   # once
 cd app
 xcodegen generate
-open AgentPulse.xcodeproj
+open VibeSignal.xcodeproj
 ```
 
 ### Xcode steps
 
-1. Select your **Team** under Signing for both `AgentPulse` and `AgentPulseWatch`.
-2. Set a unique bundle id if `com.agentpulse.app` is taken.
-3. Run the **AgentPulse** scheme on a physical iPhone (camera + local network; Watch optional).
+1. Select your **Team** under Signing for both `VibeSignal` and `VibeSignalWatch`.
+2. Set a unique bundle id if `com.vibesignal.app` is taken.
+3. Run the **VibeSignal** scheme on a physical iPhone (camera + local network; Watch optional).
 4. Install the Watch app from the Phone’s Watch app if needed.
 
 ### Pairing
 
-1. On desktop: **AgentPulse: Pair Device**.
+1. On desktop: **Vibe Signal: Pair Device**.
 2. On phone: scan the QR (or paste JSON / enter host + port + token).
 3. Phone and desktop must be on the **same Wi‑Fi**. Status becomes **Live**.
 4. Watch updates automatically via WatchConnectivity while the iPhone app is paired/reachable.

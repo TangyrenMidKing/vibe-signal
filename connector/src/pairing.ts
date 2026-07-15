@@ -11,7 +11,7 @@ export function showPairingPanel(
 ): void {
   const panel = vscode.window.createWebviewPanel(
     "agentpulsePairing",
-    "AgentPulse Pair Device",
+    "Vibe Signal Pair Device",
     vscode.ViewColumn.One,
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -25,7 +25,7 @@ export function showPairingPanel(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AgentPulse Pairing</title>
+  <title>Vibe Signal Pairing</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -78,7 +78,7 @@ export function showPairingPanel(
   </style>
 </head>
 <body>
-  <h1>Scan with AgentPulse</h1>
+  <h1>Scan with Vibe Signal</h1>
   <p>Open the iPhone app and scan this QR code while your phone is on the same Wi‑Fi.</p>
   <div class="card"><div id="qrcode"></div></div>
   <div class="meta">

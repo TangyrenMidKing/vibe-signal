@@ -30,7 +30,7 @@ async function main() {
 
   await server.start();
   const host = preferredLanAddress();
-  console.log("AgentPulse dev server");
+  console.log("Vibe Signal dev server");
   console.log(`  health  http://127.0.0.1:${port}/health`);
   console.log(`  ws      ws://${host}:${port}/?token=${token}`);
   console.log(`  token   ${token}`);

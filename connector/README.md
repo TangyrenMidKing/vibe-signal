@@ -1,4 +1,4 @@
-# AgentPulse Connector
+# Vibe Signal Connector
 
 VS Code extension that:
 
@@ -8,14 +8,14 @@ VS Code extension that:
 
 ## UI
 
-Open the **AgentPulse** icon in the Activity Bar:
+Open the **Vibe Signal** icon in the Activity Bar:
 
 - **Toggle** — enable / disable the connector (like Builder Mode)
 - **Status** — live agent state, detail, clients
 - **Connection** — LAN host:port, masked token, health URL
 - **Actions** — Pair QR, copy pairing JSON, setup Codex hooks, simulate events, rotate token
 
-Status bar shows `AgentPulse: Off` or the current state; click it to focus the sidebar.
+Status bar shows `Vibe Signal: Off` or the current state; click it to focus the sidebar.
 
 ## See it in VS Code / Cursor
 
@@ -25,12 +25,12 @@ The status bar and Activity Bar icon **only appear when this extension is runnin
 
 1. Open the `vibe-signal` repo (or just `connector/`) in VS Code / Cursor
 2. `cd connector && npm install && npm run compile`
-3. Run **Run and Debug → Run AgentPulse Extension** (or press `F5`)
+3. Run **Run and Debug → Run Vibe Signal Extension** (or press `F5`)
 4. A **new** window opens — look there (not the old window):
-   - Activity Bar: pulse icon **AgentPulse**
-   - Status bar (bottom-right): **AgentPulse Off**
+   - Activity Bar: pulse icon **Vibe Signal**
+   - Status bar (bottom-right): **Vibe Signal Off**
 
-If the status item is missing, right-click the status bar → enable **AgentPulse**.
+If the status item is missing, right-click the status bar → enable **Vibe Signal**.
 
 **Option B — Install into your normal editor**
 

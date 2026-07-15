@@ -118,7 +118,7 @@ export class ConnectorServer {
       case "deny":
         this.decisions.resolvePermission({
           decision: "deny",
-          message: cmd.text ?? "Denied from AgentPulse",
+          message: cmd.text ?? "Denied from Vibe Signal",
         });
         return { type: "ack", command: "deny", ok: true };
       case "continue":

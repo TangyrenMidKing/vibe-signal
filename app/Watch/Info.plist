@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>AgentPulse</string>
+	<string>Vibe Signal</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -17,7 +17,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.agentpulse.app</string>
+	<string>com.vibesignal.app</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKRunsIndependentlyOfCompanionApp</key>

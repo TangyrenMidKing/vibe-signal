@@ -8,6 +8,18 @@ import type { AgentState, PairingPayload, StateSnapshot } from "./types";
 
 const TOKEN_KEY = "agentpulse.pairingToken";
 const ENABLED_KEY = "agentpulse.enabled";
+const HOOKS_INSTALLED_KEY = "agentpulse.setup.hooksInstalled";
+const HOOKS_TRUSTED_KEY = "agentpulse.setup.hooksTrusted";
+const SETUP_DISMISSED_KEY = "agentpulse.setup.dismissed";
+
+export interface SetupProgress {
+  hooksInstalled: boolean;
+  hooksTrusted: boolean;
+  dismissed: boolean;
+  /** 1–4 = current guided step; 0 = complete */
+  currentStep: number;
+  complete: boolean;
+}
 
 export interface PanelInfo {
   enabled: boolean;
@@ -22,8 +34,12 @@ export interface PanelInfo {
   healthUrl: string;
   sessionId?: string;
   turnId?: string;
+  project?: string;
+  repo?: string;
+  cwd?: string;
   lastError?: string;
   ts: number;
+  setup: SetupProgress;
 }
 
 /**
@@ -64,6 +80,7 @@ export class ConnectorController extends EventEmitter {
     const port = this.server?.port ?? this.readPort();
     const host = preferredLanAddress();
     const snap = this.state.getSnapshot();
+    const clients = this.server?.clientCount() ?? 0;
     return {
       enabled: this.enabled,
       listening: Boolean(this.server),
@@ -73,20 +90,75 @@ export class ConnectorController extends EventEmitter {
       port,
       token: this.token,
       tokenMasked: maskToken(this.token),
-      clients: this.server?.clientCount() ?? 0,
+      clients,
       healthUrl: `http://127.0.0.1:${port}/health`,
       sessionId: snap.sessionId,
       turnId: snap.turnId,
+      project: snap.project,
+      repo: snap.repo,
+      cwd: snap.cwd,
       lastError: this.lastError,
       ts: snap.ts,
+      setup: this.getSetupProgress(clients),
     };
+  }
+
+  getSetupProgress(clients?: number): SetupProgress {
+    const clientCount = clients ?? this.server?.clientCount() ?? 0;
+    const hooksInstalled =
+      this.context.globalState.get<boolean>(HOOKS_INSTALLED_KEY) ?? false;
+    const hooksTrusted =
+      this.context.globalState.get<boolean>(HOOKS_TRUSTED_KEY) ?? false;
+    const dismissed =
+      this.context.globalState.get<boolean>(SETUP_DISMISSED_KEY) ?? false;
+    const paired = clientCount > 0;
+    const complete =
+      this.enabled && hooksInstalled && hooksTrusted && paired;
+
+    let currentStep = 0;
+    if (!this.enabled) currentStep = 1;
+    else if (!hooksInstalled) currentStep = 2;
+    else if (!hooksTrusted) currentStep = 3;
+    else if (!paired) currentStep = 4;
+    else currentStep = 0;
+
+    return {
+      hooksInstalled,
+      hooksTrusted,
+      dismissed,
+      currentStep,
+      complete,
+    };
+  }
+
+  async markHooksInstalled(): Promise<void> {
+    await this.context.globalState.update(HOOKS_INSTALLED_KEY, true);
+    // New install always needs re-trust confirmation.
+    await this.context.globalState.update(HOOKS_TRUSTED_KEY, false);
+    await this.context.globalState.update(SETUP_DISMISSED_KEY, false);
+    this.emit("change", this.getInfo());
+  }
+
+  async markHooksTrusted(): Promise<void> {
+    await this.context.globalState.update(HOOKS_TRUSTED_KEY, true);
+    this.emit("change", this.getInfo());
+  }
+
+  async dismissSetup(): Promise<void> {
+    await this.context.globalState.update(SETUP_DISMISSED_KEY, true);
+    this.emit("change", this.getInfo());
+  }
+
+  async resetSetup(): Promise<void> {
+    await this.context.globalState.update(SETUP_DISMISSED_KEY, false);
+    this.emit("change", this.getInfo());
   }
 
   getPairingPayload(): PairingPayload {
     const info = this.getInfo();
     return {
       v: 1,
-      name: "AgentPulse",
+      name: "Vibe Signal",
       host: info.host,
       port: info.port,
       token: this.token,
@@ -112,7 +184,7 @@ export class ConnectorController extends EventEmitter {
       await this.start();
     } else {
       await this.stop();
-      this.state.setState("idle", "AgentPulse is off");
+      this.state.setState("idle", "Vibe Signal is off");
     }
     this.emit("change", this.getInfo());
   }
@@ -176,7 +248,7 @@ export class ConnectorController extends EventEmitter {
       this.enabled = false;
       await this.context.globalState.update(ENABLED_KEY, false);
       void vscode.window.showErrorMessage(
-        `AgentPulse failed to bind port ${port}: ${String(err)}`
+        `Vibe Signal failed to bind port ${port}: ${String(err)}`
       );
     }
   }

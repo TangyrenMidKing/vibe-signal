@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>AgentPulse</string>
+	<string>Vibe Signal</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,13 +25,13 @@
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Scan the AgentPulse pairing QR code from VS Code.</string>
+	<string>Scan the Vibe Signal pairing QR code from VS Code.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Send spoken prompts to your coding agent.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record voice prompts for your coding agent.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Connect to the AgentPulse connector on your computer over Wi‑Fi.</string>
+	<string>Connect to the Vibe Signal connector on your computer over Wi‑Fi.</string>
 	<key>NSBonjourServices</key>
 	<array/>
 	<key>UIBackgroundModes</key>

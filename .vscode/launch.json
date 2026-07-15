@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run AgentPulse Extension",
+      "name": "Run Vibe Signal Extension",
       "type": "extensionHost",
       "request": "launch",
       "args": [

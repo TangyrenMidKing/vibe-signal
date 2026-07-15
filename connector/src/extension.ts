@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ConnectorController, type PanelInfo } from "./controller";
-import { AgentPulseSidebarProvider } from "./sidebar";
+import { VibeSignalSidebarProvider } from "./sidebar";
 import { showPairingPanel } from "./pairing";
 import { installCodexHooks, guideHookTrust } from "./hookInstaller";
 import type { AgentState } from "./types";
@@ -27,9 +27,9 @@ function refreshStatusBar(info: PanelInfo): void {
   if (!statusBar) return;
   // Keep text short so it is less likely to hide behind the status-bar overflow (`…`).
   if (!info.enabled) {
-    statusBar.text = "$(pulse) AgentPulse Off";
+    statusBar.text = "$(pulse) Vibe Signal Off";
     statusBar.tooltip =
-      "AgentPulse is off — click to open the sidebar and turn it on";
+      "Vibe Signal is off — click to open the sidebar and turn it on";
     statusBar.backgroundColor = new vscode.ThemeColor(
       "statusBarItem.prominentBackground"
     );
@@ -38,7 +38,7 @@ function refreshStatusBar(info: PanelInfo): void {
     );
     return;
   }
-  statusBar.text = `${stateIcon(info.state)} AgentPulse ${info.state}${
+  statusBar.text = `${stateIcon(info.state)} Vibe Signal ${info.state}${
     info.clients ? ` · ${info.clients}` : ""
   }`;
   statusBar.tooltip = `${info.detail}\nLAN ${info.host}:${info.port}\nClients: ${info.clients}\nClick to open panel`;
@@ -53,7 +53,7 @@ export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
   controller = new ConnectorController(context);
-  const sidebar = new AgentPulseSidebarProvider(controller);
+  const sidebar = new VibeSignalSidebarProvider(controller);
 
   // Stable id + Right alignment so it shows next to the clock / far-right cluster
   // and can be re-enabled from the status-bar context menu if hidden.
@@ -62,24 +62,12 @@ export async function activate(
     vscode.StatusBarAlignment.Right,
     1000
   );
-  statusBar.name = "AgentPulse";
+  statusBar.name = "Vibe Signal";
   statusBar.command = "agentpulse.focusSidebar";
   statusBar.accessibilityInformation = {
-    label: "AgentPulse connector status",
+    label: "Vibe Signal connector status",
   };
-  refreshStatusBar({
-    enabled: false,
-    listening: false,
-    state: "idle",
-    detail: "AgentPulse is off",
-    host: "—",
-    port: 8787,
-    token: "",
-    tokenMasked: "••••",
-    clients: 0,
-    healthUrl: "http://127.0.0.1:8787/health",
-    ts: Date.now(),
-  });
+  refreshStatusBar(controller.getInfo());
   statusBar.show();
 
   controller.on("change", (info: PanelInfo) => refreshStatusBar(info));
@@ -87,7 +75,7 @@ export async function activate(
   context.subscriptions.push(
     statusBar,
     vscode.window.registerWebviewViewProvider(
-      AgentPulseSidebarProvider.viewType,
+      VibeSignalSidebarProvider.viewType,
       sidebar
     ),
     {
@@ -102,7 +90,7 @@ export async function activate(
       if (!controller) return;
       const on = await controller.toggle();
       void vscode.window.showInformationMessage(
-        on ? "AgentPulse connector enabled" : "AgentPulse connector disabled"
+        on ? "Vibe Signal connector enabled" : "Vibe Signal connector disabled"
       );
     }),
     vscode.commands.registerCommand("agentpulse.enable", async () => {
@@ -114,7 +102,7 @@ export async function activate(
     vscode.commands.registerCommand("agentpulse.pairDevice", () => {
       if (!controller?.isEnabled()) {
         void vscode.window.showWarningMessage(
-          "Turn on AgentPulse in the sidebar first."
+          "Turn on Vibe Signal in the sidebar first."
         );
         return;
       }
@@ -123,7 +111,7 @@ export async function activate(
     vscode.commands.registerCommand("agentpulse.copyPairingInfo", async () => {
       if (!controller?.isEnabled()) {
         void vscode.window.showWarningMessage(
-          "Turn on AgentPulse in the sidebar first."
+          "Turn on Vibe Signal in the sidebar first."
         );
         return;
       }
@@ -131,19 +119,20 @@ export async function activate(
         JSON.stringify(controller.getPairingPayload())
       );
       void vscode.window.showInformationMessage(
-        "AgentPulse pairing JSON copied."
+        "Vibe Signal pairing JSON copied."
       );
     }),
     vscode.commands.registerCommand("agentpulse.setupHooks", async () => {
       if (!controller?.isEnabled()) {
         void vscode.window.showWarningMessage(
-          "Turn on AgentPulse in the sidebar first."
+          "Turn on Vibe Signal in the sidebar first."
         );
         return;
       }
       const info = controller.getInfo();
       try {
         const { hooksPath } = await installCodexHooks(context, info.port);
+        await controller.markHooksInstalled();
         void vscode.window.showInformationMessage(
           `Codex hooks updated at ${hooksPath}`
         );
@@ -153,6 +142,19 @@ export async function activate(
           `Hook setup failed: ${String(err)}`
         );
       }
+    }),
+    vscode.commands.registerCommand("agentpulse.markHooksTrusted", async () => {
+      await controller?.markHooksTrusted();
+      void vscode.window.showInformationMessage(
+        "Marked Codex hooks as trusted. Next: pair your iPhone."
+      );
+    }),
+    vscode.commands.registerCommand("agentpulse.dismissSetup", async () => {
+      await controller?.dismissSetup();
+    }),
+    vscode.commands.registerCommand("agentpulse.showSetupGuide", async () => {
+      await controller?.resetSetup();
+      await vscode.commands.executeCommand("agentpulse.sidebar.focus");
     }),
     vscode.commands.registerCommand("agentpulse.rotateToken", async () => {
       if (!controller) return;
@@ -164,7 +166,7 @@ export async function activate(
       if (confirm !== "Rotate") return;
       await controller.rotateToken();
       void vscode.window.showInformationMessage(
-        "AgentPulse token rotated. Re-pair your device."
+        "Vibe Signal token rotated. Re-pair your device."
       );
     }),
     vscode.commands.registerCommand("agentpulse.showStatus", async () => {
@@ -184,7 +186,7 @@ export async function activate(
     vscode.commands.registerCommand("agentpulse.simulateEvent", async () => {
       if (!controller?.isEnabled()) {
         void vscode.window.showWarningMessage(
-          "Turn on AgentPulse in the sidebar first."
+          "Turn on Vibe Signal in the sidebar first."
         );
         return;
       }
@@ -196,7 +198,7 @@ export async function activate(
           { label: "error", description: "Failure" },
           { label: "idle", description: "Reset" },
         ],
-        { placeHolder: "Simulate AgentPulse state" }
+        { placeHolder: "Simulate Vibe Signal state" }
       );
       if (!pick) return;
       const map: Record<string, { state: AgentState; detail: string }> = {
@@ -224,6 +226,10 @@ export async function activate(
   );
 
   await controller.restore();
+  const folder = vscode.workspace.workspaceFolders?.[0];
+  if (folder) {
+    controller.state.seedWorkspace(folder.uri.fsPath, folder.name);
+  }
   refreshStatusBar(controller.getInfo());
 }
 

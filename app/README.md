@@ -1,11 +1,127 @@
-# AgentPulse App (iOS + watchOS)
+# Vibe Signal App — Install on iPhone (Mac)
 
-SwiftUI sources for iPhone and Apple Watch. Build on macOS with Xcode.
+`app/` is **source code**, not an App Store build. You need a **Mac + Xcode** to compile and install on a physical iPhone (Simulator cannot scan the pairing QR).
+
+## Requirements
+
+| Need | Notes |
+|------|--------|
+| Mac | macOS + Xcode 15+ (from the Mac App Store) |
+| Apple ID | Free Personal Team is enough |
+| iPhone | iOS 17+, USB cable to the Mac |
+| This repo | Copy `vibe-signal` to the Mac, or `git clone` |
+
+Checklist:
+
+1. Unlock the iPhone and tap **Trust This Computer**
+2. Open Xcode once so extra components finish installing
+3. Xcode → **Settings → Accounts** → sign in with your Apple ID
+
+---
+
+## Generate the Xcode project
+
+On the Mac terminal:
 
 ```bash
+# If you don't have Homebrew yet: https://brew.sh
 brew install xcodegen
+
+cd /path/to/vibe-signal/app
 xcodegen generate
-open AgentPulse.xcodeproj
+open VibeSignal.xcodeproj
 ```
 
-See the root [README](../README.md) for pairing and permissions.
+Without XcodeGen you can create an App project in Xcode and drag in `iOS/`, `Shared/`, and `Watch/` — XcodeGen is usually faster.
+
+App icons (chain-link mark) live in:
+
+- `iOS/Assets.xcassets/AppIcon.appiconset`
+- `Watch/Assets.xcassets/AppIcon.appiconset`
+
+---
+
+## Sign and run on your iPhone
+
+1. Select the **VibeSignal** project in the sidebar
+2. **TARGETS → VibeSignal** → **Signing & Capabilities**
+   - Enable **Automatically manage signing**
+   - **Team**: your Apple ID Personal Team
+   - If `com.vibesignal.app` is taken, change it to something unique, e.g. `com.yourname.vibesignal`
+3. Set the same **Team** on **VibeSignalWatch**
+4. In the scheme device menu, pick your **physical iPhone** (not Simulator)
+5. Press **▶ Run**
+
+### First install: trust the developer
+
+If the app won’t open (“Untrusted Developer”):
+
+**iPhone → Settings → General → VPN & Device Management → your Apple ID → Trust**
+
+Then Run again from Xcode.
+
+### Apple Watch (optional)
+
+After the iPhone app installs, the Watch companion may install automatically. If not:
+
+**iPhone → Watch app → My Watch → Installed / Available Apps → Vibe Signal → Install**
+
+Watch must be paired; watchOS 10+.
+
+---
+
+## Pair with the desktop connector
+
+1. On the PC, open the Vibe Signal VS Code / Cursor extension → sidebar → **Connector On**
+2. Phone and PC on the **same Wi‑Fi**
+3. Sidebar → **Show Pairing QR** (or Pair Device)
+4. On iPhone, open Vibe Signal → scan (allow Camera)
+5. Desktop sidebar **clients** should become `1`
+
+If it won’t connect:
+
+- Pairing host must be a LAN IP like `192.168.x.x:8787`, not `127.0.0.1`
+- Turn off VPN / guest-network client isolation
+- Allow port `8787` through the PC firewall
+- Or use **Copy Pairing JSON** and enter it manually in the app
+
+---
+
+## Permissions
+
+On first use, allow:
+
+- **Camera** — QR pairing
+- **Microphone / Speech Recognition** — hold-to-talk prompts
+- **Local Network** — talk to the desktop connector
+
+---
+
+## Voice input
+
+**Press and hold** the mic to speak; **release** to send the transcript to the agent.
+
+---
+
+## Common errors
+
+| Symptom | Fix |
+|---------|-----|
+| Signing / App Store Connect errors | Xcode → Settings → Accounts → sign in; select Personal Team |
+| Bundle ID unavailable | Use a unique bundle identifier |
+| Failed to launch / Developer Mode | iOS 16+: **Settings → Privacy & Security → Developer Mode → On**, reboot, Allow |
+| Device grayed out | Cable + Trust Computer; Xcode → Window → Devices and Simulators |
+| `xcodegen: command not found` | `brew install xcodegen` |
+| Watch signing fails | Fix Watch target Team, or ship iPhone-only first |
+
+---
+
+## Updating later
+
+```bash
+cd /path/to/vibe-signal/app
+# if project.yml changed:
+xcodegen generate
+```
+
+Then **▶ Run** in Xcode to overwrite the installed app.

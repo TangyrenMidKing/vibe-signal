@@ -11,7 +11,7 @@ final class AppModel: NSObject, ObservableObject {
     @Published var lastError: String?
     @Published var needsPairing = true
 
-    let client = AgentPulseClient()
+    let client = Vibe SignalClient()
     private var cancellables = Set<AnyCancellable>()
     private let defaults = UserDefaults.standard
     private let pairingKey = "agentpulse.pairing"
@@ -102,7 +102,7 @@ final class AppModel: NSObject, ObservableObject {
     private func notifyIfNeeded(_ snap: StateSnapshot) {
         guard snap.state == .waiting || snap.state == .completed || snap.state == .error else { return }
         let content = UNMutableNotificationContent()
-        content.title = "AgentPulse · \(snap.state.title)"
+        content.title = "Vibe Signal · \(snap.state.title)"
         content.body = snap.detail
         content.sound = .default
         let req = UNNotificationRequest(

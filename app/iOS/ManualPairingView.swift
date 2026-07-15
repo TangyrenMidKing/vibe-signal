@@ -54,6 +54,6 @@ struct ManualPairingView: View {
 
     private func submit() {
         guard let p = Int(port) else { return }
-        onPayload(PairingPayload(v: 1, name: "AgentPulse", host: host, port: p, token: token))
+        onPayload(PairingPayload(v: 1, name: "Vibe Signal", host: host, port: p, token: token))
     }
 }

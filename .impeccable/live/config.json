@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "insertBefore": "",
+  "commentSyntax": "html",
+  "cspChecked": true,
+  "notes": "Vibe Signal primary UI is SwiftUI (iOS/Watch) + VS Code webview. Live variant mode has no HTML entry yet; configure when a web marketing surface or docs site is added."
+}

@@ -13,6 +13,11 @@ export interface StateSnapshot {
   detail: string;
   sessionId?: string;
   turnId?: string;
+  /** Workspace / folder name (e.g. Jareturn) */
+  project?: string;
+  /** Git repo identity (e.g. owner/name or folder) */
+  repo?: string;
+  cwd?: string;
   ts: number;
 }
 
@@ -32,7 +37,7 @@ export interface AckMessage {
 
 export interface PairingPayload {
   v: 1;
-  name: "AgentPulse";
+  name: "Vibe Signal";
   host: string;
   port: number;
   token: string;

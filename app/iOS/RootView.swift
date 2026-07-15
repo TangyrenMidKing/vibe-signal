@@ -4,154 +4,241 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showPairing = false
     @State private var showManual = false
-    @State private var showVoice = false
+    @State private var appear = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                model.snapshot.state.color.opacity(0.18).ignoresSafeArea()
-                VStack(spacing: 24) {
-                    StatusCard(snapshot: model.snapshot, connected: model.isConnected)
-                    ActionBar(
-                        state: model.snapshot.state,
-                        onApprove: { model.send(.approve) },
-                        onDeny: { model.send(.deny) },
-                        onContinue: { model.send(.continue) },
-                        onRetry: { model.send(.retry) },
-                        onVoice: { showVoice = true }
-                    )
-                    if let err = model.lastError {
-                        Text(err)
-                            .font(.footnote)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    Spacer()
-                }
-                .padding()
-            }
-            .navigationTitle("AgentPulse")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button("Scan QR") { showPairing = true }
-                        Button("Enter Manually") { showManual = true }
-                        if model.pairing != nil {
-                            Button("Disconnect", role: .destructive) { model.clearPairing() }
-                        }
-                    } label: {
-                        Image(systemName: "qrcode.viewfinder")
-                    }
-                }
-            }
-            .sheet(isPresented: $showPairing) {
-                QRScannerView { payload in
-                    model.applyPairing(payload)
-                    showPairing = false
-                }
-            }
-            .sheet(isPresented: $showManual) {
-                ManualPairingView { payload in
-                    model.applyPairing(payload)
-                    showManual = false
-                }
-            }
-            .sheet(isPresented: $showVoice) {
-                VoicePromptView { text in
+        ZStack {
+            background
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                topBar
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+
+                Spacer(minLength: 12)
+
+                SignalHero(snapshot: model.snapshot, connected: model.isConnected)
+                    .opacity(appear ? 1 : 0)
+                    .offset(y: appear ? 0 : 12)
+                    .animation(.easeOut(duration: 0.45), value: appear)
+
+                Spacer(minLength: 16)
+
+                contextActions
+                    .padding(.horizontal, 20)
+
+                HoldToTalkButton { text in
                     model.send(.voice_prompt, text: text)
-                    showVoice = false
+                }
+                .padding(.top, 28)
+                .padding(.bottom, 8)
+
+                if let err = model.lastError {
+                    Text(err)
+                        .font(.caption)
+                        .foregroundStyle(Color(red: 1, green: 0.45, blue: 0.4))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
                 }
             }
-            .onAppear {
-                if model.needsPairing {
-                    showPairing = true
+            .padding(.bottom, 16)
+        }
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $showPairing) {
+            QRScannerView { payload in
+                model.applyPairing(payload)
+                showPairing = false
+            }
+        }
+        .sheet(isPresented: $showManual) {
+            ManualPairingView { payload in
+                model.applyPairing(payload)
+                showManual = false
+            }
+        }
+        .onAppear {
+            appear = true
+            if model.needsPairing {
+                showPairing = true
+            }
+        }
+    }
+
+    private var background: some View {
+        LiquidAmbientBackground(state: model.snapshot.state)
+            .animation(.easeInOut(duration: 0.55), value: model.snapshot.state)
+    }
+
+    private var topBar: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Vibe Signal")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .tracking(-0.02)
+                    .foregroundStyle(.white)
+                Text(model.isConnected ? "Linked to desktop" : "Not linked")
+                    .font(.caption)
+                    .foregroundStyle(PulseTheme.mistSoft)
+            }
+            Spacer()
+            Menu {
+                Button("Scan QR", systemImage: "qrcode.viewfinder") { showPairing = true }
+                Button("Enter Manually", systemImage: "keyboard") { showManual = true }
+                if model.pairing != nil {
+                    Divider()
+                    Button("Disconnect", systemImage: "link.badge.minus", role: .destructive) {
+                        model.clearPairing()
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle.fill")
+                    .font(.system(size: 26))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(PulseTheme.mist)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var contextActions: some View {
+        switch model.snapshot.state {
+        case .waiting:
+            HStack(spacing: 12) {
+                PulseActionButton(title: "Approve", tint: PulseTheme.signal(.completed)) {
+                    model.send(.approve)
+                }
+                PulseActionButton(title: "Deny", tint: PulseTheme.signal(.working), outlined: true) {
+                    model.send(.deny)
                 }
             }
+        case .completed, .error:
+            HStack(spacing: 12) {
+                PulseActionButton(title: "Continue", tint: PulseTheme.accent) {
+                    model.send(.continue)
+                }
+                PulseActionButton(title: "Retry", tint: PulseTheme.signal(.error), outlined: true) {
+                    model.send(.retry)
+                }
+            }
+        default:
+            EmptyView()
         }
     }
 }
 
-struct StatusCard: View {
+struct SignalHero: View {
     let snapshot: StateSnapshot
     let connected: Bool
 
     var body: some View {
-        VStack(spacing: 12) {
-            Circle()
-                .fill(snapshot.state.color)
-                .frame(width: 96, height: 96)
-                .shadow(color: snapshot.state.color.opacity(0.5), radius: 16)
-            Text(snapshot.state.title.uppercased())
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .tracking(1.5)
-            Text(snapshot.detail)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            HStack(spacing: 6) {
+        VStack(spacing: 20) {
+            ZStack {
                 Circle()
-                    .fill(connected ? Color.green : Color.gray)
-                    .frame(width: 8, height: 8)
-                Text(connected ? "Live" : "Disconnected")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .stroke(PulseTheme.signal(snapshot.state).opacity(0.22), lineWidth: 16)
+                    .frame(width: 172, height: 172)
+                    .blur(radius: 0.5)
+                LiquidSignalOrb(state: snapshot.state, size: 132)
+            }
+
+            VStack(spacing: 8) {
+                Text(snapshot.state.pulseLabel.uppercased())
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .tracking(2.2)
+                    .foregroundStyle(PulseTheme.signal(snapshot.state))
+
+                Text(snapshot.state.title)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .tracking(-0.03)
+                    .foregroundStyle(.white)
+
+                ProjectRepoChips(project: snapshot.project, repo: snapshot.repo)
+
+                Text(snapshot.detail)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundStyle(PulseTheme.mist)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                    .lineLimit(3)
+
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(connected ? PulseTheme.signal(.completed) : PulseTheme.signal(.idle))
+                        .frame(width: 7, height: 7)
+                    Text(connected ? "Live" : "Reconnect from menu")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(PulseTheme.mistSoft)
+                }
+                .padding(.top, 4)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(28)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 
-struct ActionBar: View {
-    let state: AgentState
-    var onApprove: () -> Void
-    var onDeny: () -> Void
-    var onContinue: () -> Void
-    var onRetry: () -> Void
-    var onVoice: () -> Void
+struct ProjectRepoChips: View {
+    var project: String?
+    var repo: String?
 
     var body: some View {
-        VStack(spacing: 12) {
-            switch state {
-            case .waiting:
-                HStack(spacing: 12) {
-                    Button("Approve", action: onApprove)
-                        .buttonStyle(PulseButtonStyle(fill: .green))
-                    Button("Deny", action: onDeny)
-                        .buttonStyle(PulseButtonStyle(fill: .red))
+        if project != nil || repo != nil {
+            VStack(spacing: 6) {
+                if let project, !project.isEmpty {
+                    chip(icon: "folder.fill", text: project)
                 }
-            case .completed, .error:
-                HStack(spacing: 12) {
-                    Button("Continue", action: onContinue)
-                        .buttonStyle(PulseButtonStyle(fill: .blue))
-                    Button("Retry", action: onRetry)
-                        .buttonStyle(PulseButtonStyle(fill: .orange))
+                if let repo, !repo.isEmpty, repo != project {
+                    chip(icon: "shippingbox.fill", text: repo)
                 }
-            default:
-                EmptyView()
             }
-            Button {
-                onVoice()
-            } label: {
-                Label("Voice", systemImage: "mic.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(PulseButtonStyle(fill: .primary.opacity(0.85)))
+            .padding(.top, 2)
         }
+    }
+
+    private func chip(icon: String, text: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2.weight(.semibold))
+            Text(text)
+                .font(.system(.caption, design: .rounded).weight(.semibold))
+                .lineLimit(1)
+        }
+        .foregroundStyle(PulseTheme.mist)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(PulseTheme.inkElevated.opacity(0.9), in: Capsule())
+        .overlay(Capsule().stroke(PulseTheme.line, lineWidth: 1))
     }
 }
 
-struct PulseButtonStyle: ButtonStyle {
-    var fill: Color
+struct PulseActionButton: View {
+    let title: String
+    var tint: Color
+    var outlined: Bool = false
+    var action: () -> Void
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.headline)
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(fill.opacity(configuration.isPressed ? 0.7 : 1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.headline, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 15)
+                .foregroundStyle(outlined ? tint : Color.white)
+                .background(
+                    Group {
+                        if outlined {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(tint.opacity(0.55), lineWidth: 1.2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(PulseTheme.inkElevated)
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(tint)
+                        }
+                    }
+                )
+        }
+        .buttonStyle(.plain)
     }
 }

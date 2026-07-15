@@ -46,7 +46,7 @@ struct QRScannerView: View {
               payload.v == 1,
               !payload.host.isEmpty,
               !payload.token.isEmpty else {
-            errorMessage = "Invalid AgentPulse QR"
+            errorMessage = "Invalid Vibe Signal QR"
             return
         }
         onPayload(payload)

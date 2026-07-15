@@ -1,28 +1,58 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { execFileSync } from "child_process";
 import * as vscode from "vscode";
 
-function hookCommandUnix(hookScript: string, port: number): string {
-  return `node "${hookScript}" --port ${port}`;
+function resolveNodeBinary(): { unix: string; windows: string } {
+  try {
+    if (process.platform === "win32") {
+      const out = execFileSync("where.exe", ["node"], {
+        encoding: "utf8",
+        windowsHide: true,
+      })
+        .split(/\r?\n/)
+        .map((s) => s.trim())
+        .find((s) => s.toLowerCase().endsWith("node.exe"));
+      if (out) {
+        return { unix: "node", windows: out };
+      }
+    } else {
+      const out = execFileSync("which", ["node"], { encoding: "utf8" }).trim();
+      if (out) {
+        return { unix: out, windows: "node" };
+      }
+    }
+  } catch {
+    // fall through
+  }
+  const programFiles = process.env.ProgramFiles || "C:\\Program Files";
+  const guess = path.join(programFiles, "nodejs", "node.exe");
+  if (fs.existsSync(guess)) {
+    return { unix: "node", windows: guess };
+  }
+  return { unix: "node", windows: "node" };
 }
 
-function hookCommandWindows(hookScript: string, port: number): string {
-  const win = hookScript.replace(/\//g, "\\");
-  return `node "${win}" --port ${port}`;
-}
-
-function makeHandler(hookScript: string, port: number, statusMessage: string) {
+function makeHandler(
+  hookScript: string,
+  windowsCmd: string,
+  port: number,
+  statusMessage: string
+) {
+  const node = resolveNodeBinary();
+  const unixHook = hookScript.replace(/\\/g, "/");
   return {
     type: "command",
-    command: hookCommandUnix(hookScript, port),
-    commandWindows: hookCommandWindows(hookScript, port),
+    command: `${node.unix} "${unixHook}" --port ${port}`,
+    // Prefer a no-space wrapper .cmd so Codex argv parsing cannot break on Program Files.
+    commandWindows: windowsCmd,
     timeout: 180,
     statusMessage,
   };
 }
 
-function isAgentPulseGroup(group: Record<string, unknown>): boolean {
+function isVibeSignalGroup(group: Record<string, unknown>): boolean {
   const hooks = group.hooks as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(hooks)) return false;
   return hooks.some((h) => {
@@ -32,13 +62,15 @@ function isAgentPulseGroup(group: Record<string, unknown>): boolean {
     return (
       cmd.includes(".agentpulse") ||
       cmdWin.includes(".agentpulse") ||
+      cmdWin.includes("run-hook.cmd") ||
+      status.includes("Vibe Signal") ||
       status.includes("AgentPulse")
     );
   });
 }
 
 /**
- * Non-destructively merge AgentPulse hooks into ~/.codex/hooks.json
+ * Non-destructively merge Vibe Signal hooks into ~/.codex/hooks.json
  */
 export async function installCodexHooks(
   context: vscode.ExtensionContext,
@@ -55,14 +87,35 @@ export async function installCodexHooks(
   fs.copyFileSync(hookSrc, hookDest);
   fs.writeFileSync(path.join(userDir, "port"), String(port), "utf8");
 
+  const node = resolveNodeBinary();
+  const winCmd = path.join(userDir, "run-hook.cmd");
+  fs.writeFileSync(
+    winCmd,
+    [
+      "@echo off",
+      `"${node.windows.replace(/\//g, "\\")}" "%~dp0hook.js" --port ${port}`,
+      "",
+    ].join("\r\n"),
+    "utf8"
+  );
+
   const codexDir = path.join(os.homedir(), ".codex");
   fs.mkdirSync(codexDir, { recursive: true });
   const hooksPath = path.join(codexDir, "hooks.json");
 
-  let existing: { hooks?: Record<string, unknown[]> } = { hooks: {} };
+  let existing: { hooks?: Record<string, unknown[]>; description?: string } = {
+    hooks: {},
+  };
   if (fs.existsSync(hooksPath)) {
     try {
-      existing = JSON.parse(fs.readFileSync(hooksPath, "utf8"));
+      const parsed = JSON.parse(fs.readFileSync(hooksPath, "utf8")) as {
+        hooks?: Record<string, unknown[]>;
+        description?: string;
+      };
+      existing = {
+        hooks: parsed.hooks,
+        description: parsed.description,
+      };
     } catch {
       const backup = hooksPath + `.bak-${Date.now()}`;
       fs.copyFileSync(hooksPath, backup);
@@ -73,12 +126,12 @@ export async function installCodexHooks(
     existing.hooks = {};
   }
 
-  const events: Array<{ name: string; status: string; matcher?: string }> = [
+  const events: Array<{ name: string; status: string }> = [
     { name: "SessionStart", status: "session" },
     { name: "UserPromptSubmit", status: "prompt" },
-    { name: "PreToolUse", status: "tool", matcher: "*" },
-    { name: "PostToolUse", status: "tool result", matcher: "*" },
-    { name: "PermissionRequest", status: "approval", matcher: "*" },
+    { name: "PreToolUse", status: "tool" },
+    { name: "PostToolUse", status: "tool result" },
+    { name: "PermissionRequest", status: "approval" },
     { name: "Stop", status: "stop" },
   ];
 
@@ -87,20 +140,16 @@ export async function installCodexHooks(
       ? (existing.hooks[ev.name] as Array<Record<string, unknown>>)
       : [];
 
-    const filtered = list.filter((g) => !isAgentPulseGroup(g));
-    const entry: Record<string, unknown> = {
-      hooks: [makeHandler(hookDest, port, `AgentPulse ${ev.status}`)],
-    };
-    if (ev.matcher) {
-      entry.matcher = ev.matcher;
-    }
-    filtered.push(entry);
+    const filtered = list.filter((g) => !isVibeSignalGroup(g));
+    filtered.push({
+      hooks: [makeHandler(hookDest, winCmd, port, `Vibe Signal ${ev.status}`)],
+    });
     existing.hooks[ev.name] = filtered;
   }
 
   const out = {
-    _comment:
-      "Managed partially by AgentPulse. Re-run Setup Codex Hooks to refresh AgentPulse entries.",
+    description:
+      "Includes Vibe Signal companion hooks. Re-run Vibe Signal: Setup Codex Hooks to refresh.",
     hooks: existing.hooks,
   };
 
@@ -110,7 +159,7 @@ export async function installCodexHooks(
 
 export async function guideHookTrust(): Promise<void> {
   const choice = await vscode.window.showInformationMessage(
-    "AgentPulse hooks installed. In Codex CLI, run /hooks and trust the new AgentPulse entries before they will fire.",
+    "Vibe Signal hooks updated. In Codex, run /hooks — if anything needs review, Trust all again (definitions changed).",
     "Open ~/.codex",
     "OK"
   );

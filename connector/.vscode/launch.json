@@ -1,9 +1,9 @@
-# AgentPulse connector — open this folder and press F5 to launch the Extension Development Host.
+# Vibe Signal connector — open this folder and press F5.
 {
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run AgentPulse Extension",
+      "name": "Run Vibe Signal Extension",
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],

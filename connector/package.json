@@ -1,9 +1,10 @@
 {
-  "name": "agentpulse",
-  "displayName": "AgentPulse",
+  "name": "vibe-signal",
+  "displayName": "Vibe Signal",
   "description": "Keep your AI coding agent connected to your Apple Watch and iPhone.",
   "version": "0.1.0",
-  "publisher": "agentpulse",
+  "publisher": "vibesignal",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -22,7 +23,7 @@
       "activitybar": [
         {
           "id": "agentpulse",
-          "title": "AgentPulse",
+          "title": "Vibe Signal",
           "icon": "media/pulse.svg"
         }
       ]
@@ -40,47 +41,55 @@
     "commands": [
       {
         "command": "agentpulse.toggle",
-        "title": "AgentPulse: Toggle Connector"
+        "title": "Vibe Signal: Toggle Connector"
       },
       {
         "command": "agentpulse.enable",
-        "title": "AgentPulse: Enable Connector"
+        "title": "Vibe Signal: Enable Connector"
       },
       {
         "command": "agentpulse.disable",
-        "title": "AgentPulse: Disable Connector"
+        "title": "Vibe Signal: Disable Connector"
       },
       {
         "command": "agentpulse.focusSidebar",
-        "title": "AgentPulse: Open Sidebar"
+        "title": "Vibe Signal: Open Sidebar"
+      },
+      {
+        "command": "agentpulse.showSetupGuide",
+        "title": "Vibe Signal: Show Setup Guide"
+      },
+      {
+        "command": "agentpulse.markHooksTrusted",
+        "title": "Vibe Signal: Mark Hooks Trusted"
       },
       {
         "command": "agentpulse.pairDevice",
-        "title": "AgentPulse: Pair Device"
+        "title": "Vibe Signal: Pair Device"
       },
       {
         "command": "agentpulse.setupHooks",
-        "title": "AgentPulse: Setup Codex Hooks"
+        "title": "Vibe Signal: Setup Codex Hooks"
       },
       {
         "command": "agentpulse.simulateEvent",
-        "title": "AgentPulse: Simulate Event"
+        "title": "Vibe Signal: Simulate Event"
       },
       {
         "command": "agentpulse.showStatus",
-        "title": "AgentPulse: Show Status"
+        "title": "Vibe Signal: Show Status"
       },
       {
         "command": "agentpulse.copyPairingInfo",
-        "title": "AgentPulse: Copy Pairing Info"
+        "title": "Vibe Signal: Copy Pairing Info"
       },
       {
         "command": "agentpulse.rotateToken",
-        "title": "AgentPulse: Rotate Token"
+        "title": "Vibe Signal: Rotate Token"
       }
     ],
     "configuration": {
-      "title": "AgentPulse",
+      "title": "Vibe Signal",
       "properties": {
         "agentpulse.port": {
           "type": "number",
