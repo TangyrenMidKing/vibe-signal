@@ -56,6 +56,34 @@ App icons (chain-link mark) live in:
 4. In the scheme device menu, pick your **physical iPhone** (not Simulator)
 5. Press **▶ Run**
 
+### Install fails — CoreDeviceError 3002
+
+`Failed to install the app on the device` (code **3002**) is almost always signing / Watch / stale build — not Swift compile.
+
+Try in order:
+
+1. **Unlock the iPhone**, keep it on the Lock/Home screen during install  
+2. **Delete** any old AgentPulse / Vibe Signal app from the phone  
+3. Xcode → **Product → Clean Build Folder**, then delete DerivedData for this project  
+4. **Signing**: both iOS and Watch targets → same Team, “Automatically manage signing”  
+5. **Companion ID must match iOS Bundle ID**  
+   - iOS target Bundle Identifier (e.g. `com.yourname.vibesignal`)  
+   - Watch target / `Watch/Info.plist` → `WKCompanionAppBundleIdentifier` **exactly the same string**  
+   - If you still use **AgentPulse.xcodeproj**, the Watch plist was pointing at `com.vibesignal.app` while the phone app may still be `com.…AgentPulse` — that mismatch alone can trigger 3002  
+6. **Bypass Watch once** (to confirm phone install works):  
+   - Select the iOS target → **Build Phases** → remove **Embed Watch Content** (or uncheck the Watch product) → Run  
+   - Or regenerate with XcodeGen and temporarily comment the Watch `dependencies:` embed in `project.yml`  
+7. iPhone → **Settings → Privacy & Security → Developer Mode** = On  
+8. After first install: **Settings → General → VPN & Device Management → Trust** your Apple ID  
+
+Prefer generating a fresh project instead of the old AgentPulse one:
+
+```bash
+cd app
+xcodegen generate
+open VibeSignal.xcodeproj
+```
+
 ### First install: trust the developer
 
 If the app won’t open (“Untrusted Developer”):

@@ -17,7 +17,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>WKCompanionAppBundleIdentifier</key>
-	<string>com.vibesignal.app</string>
+	<string>$(VIBESIGNAL_IOS_BUNDLE_ID)</string>
 	<key>WKApplication</key>
 	<true/>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
