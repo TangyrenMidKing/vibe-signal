@@ -146,7 +146,7 @@ export class StateMachine extends EventEmitter {
       case "Stop": {
         const last =
           typeof body.last_assistant_message === "string"
-            ? body.last_assistant_message.slice(0, 100)
+            ? body.last_assistant_message.slice(0, 8_000)
             : "Turn completed";
         return this.setState("completed", last, meta);
       }

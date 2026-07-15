@@ -3,6 +3,7 @@ import SwiftUI
 struct WatchStatusView: View {
     @EnvironmentObject private var model: WatchModel
     @State private var showingVoice = false
+    @State private var showingFeedback = false
 
     private var disconnected: Bool {
         !model.phoneReachable && model.snapshot.state == .idle
@@ -41,6 +42,12 @@ struct WatchStatusView: View {
                     .foregroundStyle(PulseTheme.mist)
                     .lineLimit(2)
 
+                if !disconnected, !model.snapshot.detail.isEmpty {
+                    Button("View response") { showingFeedback = true }
+                        .font(.caption2.weight(.semibold))
+                        .tint(PulseTheme.accent)
+                }
+
                 if !disconnected {
                     if let project = model.snapshot.project, !project.isEmpty {
                         Text(project)
@@ -70,6 +77,9 @@ struct WatchStatusView: View {
                 model.send(.voice_prompt, text: text)
                 showingVoice = false
             }
+        }
+        .sheet(isPresented: $showingFeedback) {
+            FeedbackLogView(text: model.snapshot.detail)
         }
     }
 

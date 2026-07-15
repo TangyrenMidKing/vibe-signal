@@ -8,6 +8,7 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var showPairing = false
     @State private var showManual = false
+    @State private var showFeedback = false
     @State private var appear = false
 
     var body: some View {
@@ -22,7 +23,11 @@ struct RootView: View {
 
                 Spacer(minLength: 12)
 
-                SignalHero(snapshot: model.snapshot, connected: model.isConnected)
+                SignalHero(
+                    snapshot: model.snapshot,
+                    connected: model.isConnected,
+                    onShowFeedback: { showFeedback = true }
+                )
                     .opacity(appear ? 1 : 0)
                     .offset(y: appear ? 0 : 12)
                     .animation(.easeOut(duration: 0.45), value: appear)
@@ -31,12 +36,6 @@ struct RootView: View {
 
                 contextActions
                     .padding(.horizontal, 20)
-
-                HoldToTalkButton { text in
-                    model.send(.voice_prompt, text: text)
-                }
-                .padding(.top, 28)
-                .padding(.bottom, 8)
 
                 if let err = model.lastError {
                     Text(err)
@@ -47,7 +46,18 @@ struct RootView: View {
                         .padding(.bottom, 8)
                 }
             }
-            .padding(.bottom, 16)
+            // Reserve the voice dock so changing status/actions never shifts
+            // the push-to-talk control under the user's thumb.
+            .padding(.bottom, 190)
+
+            VStack {
+                Spacer()
+                HoldToTalkButton { text in
+                    model.send(.voice_prompt, text: text)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 10)
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPairing) {
@@ -62,6 +72,9 @@ struct RootView: View {
                 showManual = false
             }
         }
+        .sheet(isPresented: $showFeedback) {
+            FeedbackLogView(text: model.snapshot.detail)
+        }
         .onAppear {
             appear = true
             if model.needsPairing {
@@ -71,8 +84,7 @@ struct RootView: View {
     }
 
     private var background: some View {
-        LiquidAmbientBackground(state: model.snapshot.state)
-            .animation(.easeInOut(duration: 0.55), value: model.snapshot.state)
+        PulseTheme.ink
     }
 
     private var topBar: some View {
@@ -135,26 +147,21 @@ struct RootView: View {
 struct SignalHero: View {
     let snapshot: StateSnapshot
     let connected: Bool
+    var onShowFeedback: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .stroke(PulseTheme.signal(snapshot.state).opacity(0.22), lineWidth: 16)
-                    .frame(width: 172, height: 172)
-                    .blur(radius: 0.5)
-                LiquidSignalOrb(state: snapshot.state, size: 132)
-            }
+        VStack(spacing: 18) {
+            SignalDial(state: snapshot.state)
 
             VStack(spacing: 8) {
                 Text(snapshot.state.pulseLabel.uppercased())
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    .tracking(2.2)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .tracking(1.4)
                     .foregroundStyle(PulseTheme.signal(snapshot.state))
 
                 Text(snapshot.state.title)
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .tracking(-0.03)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .tracking(-0.02)
                     .foregroundStyle(.white)
 
                 ProjectRepoChips(project: snapshot.project, repo: snapshot.repo)
@@ -165,6 +172,14 @@ struct SignalHero: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
                     .lineLimit(3)
+
+                if snapshot.state == .completed || snapshot.state == .error {
+                    Button("View full response", systemImage: "text.alignleft") {
+                        onShowFeedback()
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PulseTheme.accent)
+                }
 
                 HStack(spacing: 8) {
                     Circle()
@@ -177,6 +192,58 @@ struct SignalHero: View {
                 .padding(.top, 4)
             }
         }
+    }
+}
+
+/// A flat, readable state indicator: closer to a field instrument than a
+/// decorative 3D object. State is conveyed by icon, label, and color.
+struct SignalDial: View {
+    let state: AgentState
+
+    private var tint: Color { PulseTheme.signal(state) }
+
+    private var symbol: String {
+        switch state {
+        case .idle: return "pause.fill"
+        case .working: return "bolt.fill"
+        case .waiting: return "exclamationmark"
+        case .completed: return "checkmark"
+        case .error: return "xmark"
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(PulseTheme.inkElevated)
+                .frame(width: 118, height: 118)
+
+            Circle()
+                .stroke(PulseTheme.line, lineWidth: 1)
+                .frame(width: 118, height: 118)
+
+            Circle()
+                .trim(from: 0.08, to: state == .idle ? 0.32 : 0.92)
+                .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .frame(width: 100, height: 100)
+                .animation(.easeOut(duration: 0.25), value: state)
+
+            Image(systemName: symbol)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(tint)
+                .accessibilityHidden(true)
+
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    Capsule()
+                        .fill(index == 1 && state == .working ? tint : PulseTheme.line)
+                        .frame(width: 14, height: 3)
+                }
+            }
+            .offset(y: 37)
+        }
+        .accessibilityLabel(state.title)
     }
 }
 
@@ -247,181 +314,6 @@ struct PulseActionButton: View {
     }
 }
 
-// MARK: - Liquid signal (kept in RootView so AgentPulse.xcodeproj picks them up)
-
-struct LiquidSignalOrb: View {
-    var state: AgentState
-    var size: CGFloat = 132
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var tint: Color { PulseTheme.signal(state) }
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1.0 : 1.0 / 30.0, paused: reduceMotion)) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
-            let phase = reduceMotion ? 0.0 : t
-            ZStack {
-                Circle()
-                    .fill(tint.opacity(0.22))
-                    .blur(radius: size * 0.18)
-                    .frame(width: size * 1.35, height: size * 1.35)
-                    .scaleEffect(reduceMotion ? 1.0 : 1.0 + 0.03 * sin(phase * 1.4))
-
-                ZStack {
-                    Circle()
-                        .fill(Color.black.opacity(0.35))
-
-                    liquidMass(phase: phase)
-                        .blur(radius: size * 0.055)
-
-                    Ellipse()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    .white.opacity(state == .idle ? 0.18 : 0.42),
-                                    .white.opacity(0.0)
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: size * 0.38
-                            )
-                        )
-                        .frame(width: size * 0.55, height: size * 0.32)
-                        .offset(
-                            x: reduceMotion ? -size * 0.12 : size * 0.14 * cos(phase * 0.9),
-                            y: reduceMotion ? -size * 0.22 : -size * 0.22 + size * 0.06 * sin(phase * 1.1)
-                        )
-                        .blendMode(.screen)
-
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [.clear, Color.black.opacity(0.35)],
-                                startPoint: .center,
-                                endPoint: .bottom
-                            )
-                        )
-
-                    if state == .working && !reduceMotion {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .tint(.white.opacity(0.9))
-                            .scaleEffect(1.15)
-                    }
-                }
-                .frame(width: size, height: size)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    .white.opacity(0.45),
-                                    .white.opacity(0.08),
-                                    tint.opacity(0.35)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.2
-                        )
-                )
-                .shadow(color: tint.opacity(0.55), radius: size * 0.18, y: size * 0.06)
-            }
-            .animation(.easeInOut(duration: 0.5), value: state)
-        }
-        .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private func liquidMass(phase: Double) -> some View {
-        let amplitude = energy(for: state)
-        ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            tint.opacity(0.95),
-                            tint.opacity(0.65),
-                            tint.opacity(0.35)
-                        ],
-                        center: UnitPoint(x: 0.35, y: 0.3),
-                        startRadius: size * 0.05,
-                        endRadius: size * 0.55
-                    )
-                )
-
-            ForEach(0..<4, id: \.self) { i in
-                let speed = 0.7 + Double(i) * 0.35
-                let angle = phase * speed + Double(i) * 1.7
-                let r = size * (0.12 + 0.04 * Double(i % 2)) * amplitude
-                Ellipse()
-                    .fill(blobColor(index: i).opacity(0.55))
-                    .frame(
-                        width: size * (0.42 + 0.08 * sin(angle)),
-                        height: size * (0.36 + 0.1 * cos(angle * 1.3))
-                    )
-                    .offset(
-                        x: r * cos(angle),
-                        y: r * sin(angle * 0.85)
-                    )
-                    .blendMode(.plusLighter)
-            }
-        }
-    }
-
-    private func energy(for state: AgentState) -> CGFloat {
-        switch state {
-        case .idle: return 0.35
-        case .working: return 1.0
-        case .waiting: return 0.75
-        case .completed: return 0.45
-        case .error: return 0.9
-        }
-    }
-
-    private func blobColor(index: Int) -> Color {
-        switch index % 4 {
-        case 0: return .white
-        case 1: return tint
-        case 2: return PulseTheme.accent
-        default: return Color(red: 1, green: 0.92, blue: 0.75)
-        }
-    }
-}
-
-struct LiquidAmbientBackground: View {
-    var state: AgentState
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 2.0 : 1.0 / 24.0, paused: reduceMotion)) { timeline in
-            let t = reduceMotion ? 0.0 : timeline.date.timeIntervalSinceReferenceDate
-            let tint = PulseTheme.signal(state)
-            ZStack {
-                PulseTheme.ink
-                Circle()
-                    .fill(tint.opacity(0.28))
-                    .frame(width: 340, height: 340)
-                    .blur(radius: 60)
-                    .offset(
-                        x: reduceMotion ? 0 : 18 * cos(t * 0.35),
-                        y: reduceMotion ? -40 : -40 + 16 * sin(t * 0.28)
-                    )
-                Circle()
-                    .fill(PulseTheme.accent.opacity(0.12))
-                    .frame(width: 260, height: 260)
-                    .blur(radius: 50)
-                    .offset(
-                        x: reduceMotion ? 60 : 60 + 22 * sin(t * 0.31),
-                        y: reduceMotion ? 80 : 80 + 14 * cos(t * 0.4)
-                    )
-            }
-        }
-    }
-}
-
 // MARK: - Hold to talk
 
 struct HoldToTalkButton: View {
@@ -431,10 +323,28 @@ struct HoldToTalkButton: View {
     @State private var transcript = ""
     @State private var errorMessage: String?
     @State private var pulse = false
+    @State private var isFinalizing = false
+    @State private var pendingSendID: UUID?
     @StateObject private var speech = SpeechCapture()
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 10) {
+            Group {
+                if !transcript.isEmpty {
+                    Text(transcript)
+                        .font(.system(.callout, design: .rounded))
+                        .foregroundStyle(PulseTheme.mist)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                } else if let errorMessage {
+                    Text(errorMessage)
+                        .font(.caption)
+                        .foregroundStyle(Color(red: 1, green: 0.45, blue: 0.4))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .bottom)
+
             Text(statusCopy)
                 .font(.system(.subheadline, design: .rounded).weight(.medium))
                 .foregroundStyle(PulseTheme.mist)
@@ -506,34 +416,21 @@ struct HoldToTalkButton: View {
             )
             .accessibilityLabel("Hold to talk")
             .accessibilityHint("Press and hold to speak, release to send")
-
-            if !transcript.isEmpty {
-                Text(transcript)
-                    .font(.system(.callout, design: .rounded))
-                    .foregroundStyle(PulseTheme.mist)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 20)
-                    .lineLimit(3)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(Color(red: 1, green: 0.45, blue: 0.4))
-            }
         }
     }
 
     private var statusCopy: String {
         if isPressed { return "Listening — release to send" }
+        if isFinalizing { return "Transcribing..." }
         return "Hold to talk"
     }
 
     private func beginHold() {
+        pendingSendID = nil
         errorMessage = nil
         transcript = ""
         isPressed = true
+        isFinalizing = false
         pulse = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         speech.start { result in
@@ -541,9 +438,11 @@ struct HoldToTalkButton: View {
             case .success(let spoken):
                 transcript = spoken
             case .failure(let error):
+                pendingSendID = nil
                 errorMessage = error.localizedDescription
                 isPressed = false
                 pulse = false
+                isFinalizing = false
             }
         }
     }
@@ -553,14 +452,24 @@ struct HoldToTalkButton: View {
         speech.stop()
         isPressed = false
         pulse = false
+        isFinalizing = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            errorMessage = nil
-            return
+        let sendID = UUID()
+        pendingSendID = sendID
+
+        // The recognizer often returns the final words just after audio ends.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            guard pendingSendID == sendID else { return }
+            pendingSendID = nil
+            isFinalizing = false
+            let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                errorMessage = "No speech detected. Hold, speak, then release."
+                return
+            }
+            onSend(trimmed)
+            transcript = ""
         }
-        onSend(trimmed)
-        transcript = ""
     }
 }
 
@@ -570,10 +479,14 @@ final class SpeechCapture: ObservableObject {
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
     private let recognizer = SFSpeechRecognizer()
+    private var startAttempt = UUID()
 
     func start(_ onPartial: @escaping (Result<String, Error>) -> Void) {
+        let attempt = UUID()
+        startAttempt = attempt
         SFSpeechRecognizer.requestAuthorization { status in
             Task { @MainActor in
+                guard self.startAttempt == attempt else { return }
                 guard status == .authorized else {
                     onPartial(.failure(NSError(
                         domain: "VibeSignal",
@@ -588,7 +501,7 @@ final class SpeechCapture: ObservableObject {
     }
 
     private func begin(onPartial: @escaping (Result<String, Error>) -> Void) {
-        stop()
+        stop(cancelRecognition: true)
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         self.request = request
@@ -628,14 +541,19 @@ final class SpeechCapture: ObservableObject {
         }
     }
 
-    func stop() {
+    func stop(cancelRecognition: Bool = false) {
+        // Do not start recording after a quick press-and-release while iOS is
+        // still resolving microphone/speech authorization.
+        startAttempt = UUID()
         if audioEngine.isRunning {
             audioEngine.stop()
         }
         audioEngine.inputNode.removeTap(onBus: 0)
         request?.endAudio()
         task?.finish()
-        task?.cancel()
+        if cancelRecognition {
+            task?.cancel()
+        }
         request = nil
         task = nil
     }

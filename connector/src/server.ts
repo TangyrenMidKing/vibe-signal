@@ -113,26 +113,25 @@ export class ConnectorServer {
   handleCommand(cmd: CommandMessage): AckMessage {
     switch (cmd.command) {
       case "approve":
-        this.decisions.resolvePermission({ decision: "allow" });
-        return { type: "ack", command: "approve", ok: true };
+        return this.decisionAck(
+          "approve",
+          this.decisions.resolvePermission({ decision: "allow" })
+        );
       case "deny":
-        this.decisions.resolvePermission({
+        return this.decisionAck("deny", this.decisions.resolvePermission({
           decision: "deny",
           message: cmd.text ?? "Denied from Vibe Signal",
-        });
-        return { type: "ack", command: "deny", ok: true };
+        }));
       case "continue":
-        this.decisions.resolveStop({
+        return this.decisionAck("continue", this.decisions.resolveStop({
           decision: "continue",
           reason: cmd.text?.trim() || "Continue.",
-        });
-        return { type: "ack", command: "continue", ok: true };
+        }));
       case "retry":
-        this.decisions.resolveStop({
+        return this.decisionAck("retry", this.decisions.resolveStop({
           decision: "continue",
           reason: cmd.text?.trim() || "Retry.",
-        });
-        return { type: "ack", command: "retry", ok: true };
+        }));
       case "voice_prompt": {
         const text = cmd.text?.trim();
         if (!text) {
@@ -143,8 +142,10 @@ export class ConnectorServer {
             message: "Missing text",
           };
         }
-        this.decisions.resolveStop({ decision: "continue", reason: text });
-        return { type: "ack", command: "voice_prompt", ok: true };
+        return this.decisionAck(
+          "voice_prompt",
+          this.decisions.resolveStop({ decision: "continue", reason: text })
+        );
       }
       default:
         return {
@@ -154,6 +155,17 @@ export class ConnectorServer {
           message: "Unknown command",
         };
     }
+  }
+
+  private decisionAck(command: AgentCommand, ok: boolean): AckMessage {
+    return ok
+      ? { type: "ack", command, ok: true }
+      : {
+          type: "ack",
+          command,
+          ok: false,
+          message: "Codex is not waiting for a phone command. Start a turn first.",
+        };
   }
 
   private onWsConnection(ws: WebSocket): void {
@@ -213,7 +225,6 @@ export class ConnectorServer {
 
     if (path === "/hook/event" && req.method === "POST") {
       const body = await readJson(req);
-      this.state.applyHookEvent(body);
       const event = String(body.hook_event_name ?? "");
       const turnId =
         typeof body.turn_id === "string"
@@ -226,6 +237,7 @@ export class ConnectorServer {
       } else if (event === "Stop") {
         this.decisions.beginStop(turnId);
       }
+      this.state.applyHookEvent(body);
       this.json(res, 200, { ok: true });
       return;
     }
@@ -235,7 +247,6 @@ export class ConnectorServer {
       const timeoutMs = Number(
         url.searchParams.get("timeout_ms") ?? this.permissionTimeoutMs
       );
-      this.decisions.beginPermission(turnId);
       const decision = await this.decisions.waitPermission(turnId, timeoutMs);
       this.json(res, 200, decision);
       return;
@@ -246,7 +257,6 @@ export class ConnectorServer {
       const timeoutMs = Number(
         url.searchParams.get("timeout_ms") ?? this.stopTimeoutMs
       );
-      this.decisions.beginStop(turnId);
       const decision = await this.decisions.waitStop(turnId, timeoutMs);
       this.json(res, 200, decision);
       return;
