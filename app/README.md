@@ -34,7 +34,7 @@ open VibeSignal.xcodeproj
 
 Close any old **AgentPulse.xcodeproj** if you still have one — targets and file membership can lag behind `project.yml`. Always open **VibeSignal.xcodeproj** after `xcodegen generate`.
 
-`iOS/VoicePromptView.swift` is kept only so older AgentPulse projects that still reference it can compile; the live UI uses **Hold to talk** instead.
+`iOS/VoicePromptView.swift` is kept only so older AgentPulse projects that still reference it can compile; the live UI uses **Hold to talk** (defined in `RootView.swift` so AgentPulse.xcodeproj does not need new file membership).
 
 Without XcodeGen you can create an App project in Xcode and drag in `iOS/`, `Shared/`, and `Watch/` — XcodeGen is usually faster.
 
