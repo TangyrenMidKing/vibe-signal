@@ -20,7 +20,10 @@ final class PhoneSession: NSObject, WCSessionDelegate {
     }
 
     func push(state: StateSnapshot, connected: Bool) {
-        guard let session, session.activationState == .activated else { return }
+        guard let session,
+              session.activationState == .activated,
+              session.isPaired,
+              session.isWatchAppInstalled else { return }
         var payload = state.wcPayload
         payload[WCKeys.connected] = connected
         try? session.updateApplicationContext(payload)

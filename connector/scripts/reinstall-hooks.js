@@ -41,7 +41,7 @@ function handler(status) {
     type: "command",
     command: cmdUnix,
     commandWindows: winCmd,
-    timeout: 180,
+    timeout: 360,
     statusMessage: `Vibe Signal ${status}`,
   };
 }

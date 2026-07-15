@@ -110,6 +110,10 @@ final class AppModel: NSObject, ObservableObject {
     }
 
     func send(_ command: AgentCommand, text: String? = nil) {
+        guard isCommandWindowOpen(for: command) else {
+            lastError = "This Codex response is no longer accepting remote commands. Start a new turn on your desktop."
+            return
+        }
         client.send(command: command, text: text)
     }
 
@@ -141,6 +145,16 @@ final class AppModel: NSObject, ObservableObject {
     func setSpeechLanguage(_ language: SpeechLanguage) {
         speechLanguage = language
         defaults.set(language.rawValue, forKey: speechLanguageKey)
+    }
+
+    private func isCommandWindowOpen(for command: AgentCommand) -> Bool {
+        let ageMs = Int64(Date().timeIntervalSince1970 * 1_000) - snapshot.ts
+        switch command {
+        case .approve, .deny:
+            return snapshot.state == .waiting && ageMs < 115_000
+        case .continue, .retry, .voice_prompt:
+            return snapshot.state == .completed && ageMs < 295_000
+        }
     }
 
     private func requestNotificationPermission() {

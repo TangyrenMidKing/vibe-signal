@@ -24,10 +24,24 @@ final class WatchModel: NSObject, ObservableObject {
     }
 
     func send(_ command: AgentCommand, text: String? = nil) {
+        guard isCommandWindowOpen(for: command) else {
+            WKInterfaceDevice.current().play(.failure)
+            return
+        }
         guard let session, session.isReachable else { return }
         var msg: [String: Any] = [WCKeys.command: command.rawValue]
         if let text { msg[WCKeys.text] = text }
         session.sendMessage(msg, replyHandler: nil) { _ in }
+    }
+
+    private func isCommandWindowOpen(for command: AgentCommand) -> Bool {
+        let ageMs = Int64(Date().timeIntervalSince1970 * 1_000) - snapshot.ts
+        switch command {
+        case .approve, .deny:
+            return snapshot.state == .waiting && ageMs < 115_000
+        case .continue, .retry, .voice_prompt:
+            return snapshot.state == .completed && ageMs < 295_000
+        }
     }
 
     func apply(_ dict: [String: Any]) {

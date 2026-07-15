@@ -47,7 +47,7 @@ function makeHandler(
     command: `${node.unix} "${unixHook}" --port ${port}`,
     // Prefer a no-space wrapper .cmd so Codex argv parsing cannot break on Program Files.
     commandWindows: windowsCmd,
-    timeout: 180,
+    timeout: 360,
     statusMessage,
   };
 }

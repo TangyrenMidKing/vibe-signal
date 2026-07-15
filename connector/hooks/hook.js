@@ -177,9 +177,9 @@ async function main() {
       const { json } = await request(
         port,
         "GET",
-        `/decision/stop?turn_id=${encodeURIComponent(turnId)}&timeout_ms=60000`,
+        `/decision/stop?turn_id=${encodeURIComponent(turnId)}&timeout_ms=300000`,
         null,
-        65_000
+        305_000
       );
       log(`stop decision=${JSON.stringify(json)}`);
       if (json.decision === "continue" && json.reason) {

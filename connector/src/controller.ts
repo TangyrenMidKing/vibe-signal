@@ -224,7 +224,7 @@ export class ConnectorController extends EventEmitter {
     const port = config.get<number>("port") ?? 8787;
     const permissionTimeoutMs =
       config.get<number>("permissionTimeoutMs") ?? 120_000;
-    const stopTimeoutMs = config.get<number>("stopTimeoutMs") ?? 60_000;
+    const stopTimeoutMs = config.get<number>("stopTimeoutMs") ?? 300_000;
 
     this.server = new ConnectorServer({
       port,

@@ -103,7 +103,7 @@
         },
         "agentpulse.stopTimeoutMs": {
           "type": "number",
-          "default": 60000,
+          "default": 300000,
           "description": "How long hooks wait for Continue/voice after a turn completes."
         }
       }

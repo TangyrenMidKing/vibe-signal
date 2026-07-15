@@ -103,6 +103,13 @@ public final class VibeSignalClient: ObservableObject {
         case .ack(_, let ok, let message):
             if !ok {
                 lastError = message ?? "Command failed"
+                // The connector has already closed its hook window. Do not
+                // leave stale Continue/Retry controls on screen.
+                if message?.localizedCaseInsensitiveContains("not waiting") == true {
+                    let idle = StateSnapshot(state: .idle, detail: "Waiting for agent")
+                    snapshot = idle
+                    onStateChange?(idle)
+                }
             }
         case .unknown:
             break
