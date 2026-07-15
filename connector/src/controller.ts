@@ -3,6 +3,7 @@ import * as vscode from "vscode";
 import { StateMachine } from "./state";
 import { DecisionHub } from "./decisionHub";
 import { ConnectorServer } from "./server";
+import { launchCodexTurn } from "./codexLauncher";
 import { generateToken, preferredLanAddress } from "./network";
 import type { AgentState, PairingPayload, StateSnapshot } from "./types";
 
@@ -234,6 +235,22 @@ export class ConnectorController extends EventEmitter {
       permissionTimeoutMs,
       stopTimeoutMs,
       onClientCountChange: () => this.emit("change", this.getInfo()),
+      onStartTurn: async (request) => {
+        const cwd =
+          request.cwd ??
+          vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const started = await launchCodexTurn({
+          ...request,
+          cwd,
+        });
+        if (started) {
+          this.state.setState("working", request.prompt, {
+            sessionId: request.sessionId,
+            cwd,
+          });
+        }
+        return started;
+      },
     });
 
     try {

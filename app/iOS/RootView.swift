@@ -117,7 +117,7 @@ struct RootView: View {
                 }
                 if model.pairing != nil {
                     Divider()
-                    Button("Disconnect", systemImage: "link", role: .destructive) {
+                    Button("Disconnect", systemImage: "xmark.circle", role: .destructive) {
                         model.clearPairing()
                     }
                 }

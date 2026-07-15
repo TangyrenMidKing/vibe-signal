@@ -114,6 +114,7 @@ final class AppModel: NSObject, ObservableObject {
             lastError = "This Codex response is no longer accepting remote commands. Start a new turn on your desktop."
             return
         }
+        lastError = nil
         client.send(command: command, text: text)
     }
 
@@ -152,8 +153,12 @@ final class AppModel: NSObject, ObservableObject {
         switch command {
         case .approve, .deny:
             return snapshot.state == .waiting && ageMs < 115_000
-        case .continue, .retry, .voice_prompt:
+        case .continue, .retry:
             return snapshot.state == .completed && ageMs < 295_000
+        case .voice_prompt:
+            // The connector can inject into an active Stop hook or launch a
+            // fresh/resumed Codex turn when the agent is idle.
+            return isConnected
         }
     }
 

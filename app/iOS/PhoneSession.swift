@@ -20,16 +20,32 @@ final class PhoneSession: NSObject, WCSessionDelegate {
     }
 
     func push(state: StateSnapshot, connected: Bool) {
-        guard let session,
-              session.activationState == .activated,
-              session.isPaired,
-              session.isWatchAppInstalled else { return }
+        guard canPushToWatch else { return }
+        guard let session else { return }
+
         var payload = state.wcPayload
         payload[WCKeys.connected] = connected
-        try? session.updateApplicationContext(payload)
+
+        // Watch may disappear between the guard and this call; swallow that.
+        do {
+            try session.updateApplicationContext(payload)
+        } catch {
+            // WCErrorCodeWatchAppNotInstalled / not reachable — ignore.
+        }
+
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { _ in }
         }
+    }
+
+    private var canPushToWatch: Bool {
+        guard let session,
+              session.activationState == .activated,
+              session.isPaired,
+              session.isWatchAppInstalled else {
+            return false
+        }
+        return true
     }
 
     nonisolated func session(
@@ -41,6 +57,10 @@ final class PhoneSession: NSObject, WCSessionDelegate {
     nonisolated func sessionDidBecomeInactive(_ session: WCSession) {}
     nonisolated func sessionDidDeactivate(_ session: WCSession) {
         session.activate()
+    }
+
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
+        // Watch app install / uninstall — no action; next push() re-checks.
     }
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {

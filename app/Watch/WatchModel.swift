@@ -39,8 +39,10 @@ final class WatchModel: NSObject, ObservableObject {
         switch command {
         case .approve, .deny:
             return snapshot.state == .waiting && ageMs < 115_000
-        case .continue, .retry, .voice_prompt:
+        case .continue, .retry:
             return snapshot.state == .completed && ageMs < 295_000
+        case .voice_prompt:
+            return phoneConnected
         }
     }
 

@@ -101,7 +101,9 @@ public final class VibeSignalClient: ObservableObject {
         case .ping:
             task?.send(.string(#"{"type":"pong"}"#)) { _ in }
         case .ack(_, let ok, let message):
-            if !ok {
+            if ok {
+                lastError = nil
+            } else {
                 lastError = message ?? "Command failed"
                 // The connector has already closed its hook window. Do not
                 // leave stale Continue/Retry controls on screen.

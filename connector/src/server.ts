@@ -19,6 +19,13 @@ export interface ConnectorServerOptions {
   permissionTimeoutMs: number;
   stopTimeoutMs: number;
   onClientCountChange?: (count: number) => void;
+  onStartTurn?: (request: StartTurnRequest) => Promise<boolean>;
+}
+
+export interface StartTurnRequest {
+  prompt: string;
+  sessionId?: string;
+  cwd?: string;
 }
 
 export class ConnectorServer {
@@ -33,6 +40,7 @@ export class ConnectorServer {
   private readonly permissionTimeoutMs: number;
   private readonly stopTimeoutMs: number;
   private readonly onClientCountChange?: (count: number) => void;
+  private readonly onStartTurn?: (request: StartTurnRequest) => Promise<boolean>;
 
   constructor(opts: ConnectorServerOptions) {
     this.port = opts.port;
@@ -42,6 +50,7 @@ export class ConnectorServer {
     this.permissionTimeoutMs = opts.permissionTimeoutMs;
     this.stopTimeoutMs = opts.stopTimeoutMs;
     this.onClientCountChange = opts.onClientCountChange;
+    this.onStartTurn = opts.onStartTurn;
 
     this.httpServer = http.createServer((req, res) => {
       void this.handleHttp(req, res);
@@ -110,7 +119,7 @@ export class ConnectorServer {
     }
   }
 
-  handleCommand(cmd: CommandMessage): AckMessage {
+  async handleCommand(cmd: CommandMessage): Promise<AckMessage> {
     switch (cmd.command) {
       case "approve":
         return this.decisionAck(
@@ -142,10 +151,26 @@ export class ConnectorServer {
             message: "Missing text",
           };
         }
-        return this.decisionAck(
-          "voice_prompt",
-          this.decisions.resolveStop({ decision: "continue", reason: text })
-        );
+        if (this.decisions.resolveStop({ decision: "continue", reason: text })) {
+          return { type: "ack", command: "voice_prompt", ok: true };
+        }
+        if (this.onStartTurn) {
+          const current = this.state.get();
+          const started = await this.onStartTurn({
+            prompt: text,
+            sessionId: current.sessionId,
+            cwd: current.cwd,
+          });
+          if (started) {
+            return { type: "ack", command: "voice_prompt", ok: true };
+          }
+        }
+        return {
+          type: "ack",
+          command: "voice_prompt",
+          ok: false,
+          message: "Could not start a Codex turn on the desktop.",
+        };
       }
       default:
         return {
@@ -173,12 +198,12 @@ export class ConnectorServer {
     this.onClientCountChange?.(this.clients.size);
     ws.send(JSON.stringify(this.state.getSnapshot()));
 
-    ws.on("message", (data) => {
+    ws.on("message", async (data) => {
       try {
         const msg = JSON.parse(String(data)) as CommandMessage | { type: string };
         if (msg.type === "pong") return;
         if (msg.type === "command") {
-          const ack = this.handleCommand(msg as CommandMessage);
+          const ack = await this.handleCommand(msg as CommandMessage);
           ws.send(JSON.stringify(ack));
         }
       } catch {
