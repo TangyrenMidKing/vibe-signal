@@ -3,6 +3,40 @@ import Combine
 import UserNotifications
 import WatchConnectivity
 
+enum SpeechLanguage: String, CaseIterable, Identifiable {
+    case system
+    case englishUS = "en-US"
+    case englishUK = "en-GB"
+    case chineseSimplified = "zh-CN"
+    case chineseTraditional = "zh-TW"
+    case japanese = "ja-JP"
+    case korean = "ko-KR"
+    case spanish = "es-ES"
+    case french = "fr-FR"
+    case german = "de-DE"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "System default"
+        case .englishUS: return "English (US)"
+        case .englishUK: return "English (UK)"
+        case .chineseSimplified: return "中文（简体）"
+        case .chineseTraditional: return "中文（繁體）"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
+        case .spanish: return "Español"
+        case .french: return "Français"
+        case .german: return "Deutsch"
+        }
+    }
+
+    var localeIdentifier: String {
+        self == .system ? Locale.current.identifier : rawValue
+    }
+}
+
 @MainActor
 final class AppModel: NSObject, ObservableObject {
     @Published var pairing: PairingPayload?
@@ -10,16 +44,19 @@ final class AppModel: NSObject, ObservableObject {
     @Published var isConnected = false
     @Published var lastError: String?
     @Published var needsPairing = true
+    @Published var speechLanguage: SpeechLanguage = .system
 
     let client = VibeSignalClient()
     private var cancellables = Set<AnyCancellable>()
     private let defaults = UserDefaults.standard
     private let pairingKey = "agentpulse.pairing"
+    private let speechLanguageKey = "vibesignal.speechLanguage"
 
     private lazy var phoneSession: PhoneSession = PhoneSession(appModel: self)
 
     func start() {
         loadPairing()
+        loadSpeechLanguage()
         requestNotificationPermission()
         phoneSession.activate()
 
@@ -93,6 +130,17 @@ final class AppModel: NSObject, ObservableObject {
         }
         pairing = payload
         needsPairing = false
+    }
+
+    private func loadSpeechLanguage() {
+        guard let raw = defaults.string(forKey: speechLanguageKey),
+              let language = SpeechLanguage(rawValue: raw) else { return }
+        speechLanguage = language
+    }
+
+    func setSpeechLanguage(_ language: SpeechLanguage) {
+        speechLanguage = language
+        defaults.set(language.rawValue, forKey: speechLanguageKey)
     }
 
     private func requestNotificationPermission() {

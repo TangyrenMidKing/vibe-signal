@@ -20,6 +20,10 @@
 	<string>$(VIBESIGNAL_IOS_BUNDLE_ID)</string>
 	<key>WKApplication</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Hold to speak a response to your coding agent.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Convert your spoken response into text for your coding agent.</string>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<false/>
 </dict>

@@ -3,7 +3,6 @@ import SwiftUI
 struct WatchStatusView: View {
     @EnvironmentObject private var model: WatchModel
     @State private var showingVoice = false
-    @State private var showingFeedback = false
 
     private var disconnected: Bool {
         !model.phoneReachable && model.snapshot.state == .idle
@@ -36,17 +35,11 @@ struct WatchStatusView: View {
                     .tracking(1.2)
                     .foregroundStyle(.white)
 
-                Text(disconnected ? "Open iPhone" : model.snapshot.detail)
+                Text(disconnected ? "Open iPhone" : model.snapshot.state.pulseLabel)
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(PulseTheme.mist)
-                    .lineLimit(2)
-
-                if !disconnected, !model.snapshot.detail.isEmpty {
-                    Button("View response") { showingFeedback = true }
-                        .font(.caption2.weight(.semibold))
-                        .tint(PulseTheme.accent)
-                }
+                    .lineLimit(1)
 
                 if !disconnected {
                     if let project = model.snapshot.project, !project.isEmpty {
@@ -78,9 +71,6 @@ struct WatchStatusView: View {
                 showingVoice = false
             }
         }
-        .sheet(isPresented: $showingFeedback) {
-            FeedbackLogView(text: model.snapshot.detail)
-        }
     }
 
     @ViewBuilder
@@ -99,6 +89,18 @@ struct WatchStatusView: View {
                 Button("Go") { model.send(.continue) }
                     .tint(PulseTheme.accent)
                 Button("Mic") { showingVoice = true }
+                Button {
+                    model.replayResponse()
+                } label: {
+                    Image(systemName: "speaker.wave.2.fill")
+                }
+                .tint(PulseTheme.accent)
+                Button {
+                    model.stopSpeaking()
+                } label: {
+                    Image(systemName: "stop.fill")
+                }
+                .tint(PulseTheme.mist)
             }
             .font(.caption2.weight(.semibold))
         default:

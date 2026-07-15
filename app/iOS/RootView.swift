@@ -46,18 +46,17 @@ struct RootView: View {
                         .padding(.bottom, 8)
                 }
             }
-            // Reserve the voice dock so changing status/actions never shifts
-            // the push-to-talk control under the user's thumb.
-            .padding(.bottom, 190)
-
-            VStack {
-                Spacer()
-                HoldToTalkButton { text in
+            // Unlike an overlay, a safe-area inset takes real layout space.
+            // Continue/Retry therefore remain above the transcript while the
+            // mic itself stays anchored at the bottom of the screen.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HoldToTalkButton(language: model.speechLanguage) { text in
                     model.send(.voice_prompt, text: text)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 10)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
         }
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showPairing) {
@@ -102,6 +101,20 @@ struct RootView: View {
             Menu {
                 Button("Scan QR", systemImage: "qrcode.viewfinder") { showPairing = true }
                 Button("Enter Manually", systemImage: "keyboard") { showManual = true }
+                Menu("Speech language", systemImage: "waveform") {
+                    ForEach(SpeechLanguage.allCases) { language in
+                        Button {
+                            model.setSpeechLanguage(language)
+                        } label: {
+                            Label(
+                                language.title,
+                                systemImage: model.speechLanguage == language
+                                    ? "checkmark"
+                                    : "circle"
+                            )
+                        }
+                    }
+                }
                 if model.pairing != nil {
                     Divider()
                     Button("Disconnect", systemImage: "link.badge.minus", role: .destructive) {
@@ -317,6 +330,7 @@ struct PulseActionButton: View {
 // MARK: - Hold to talk
 
 struct HoldToTalkButton: View {
+    let language: SpeechLanguage
     var onSend: (String) -> Void
 
     @State private var isPressed = false
@@ -433,7 +447,7 @@ struct HoldToTalkButton: View {
         isFinalizing = false
         pulse = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        speech.start { result in
+        speech.start(localeIdentifier: language.localeIdentifier) { result in
             switch result {
             case .success(let spoken):
                 transcript = spoken
@@ -478,10 +492,13 @@ final class SpeechCapture: ObservableObject {
     private let audioEngine = AVAudioEngine()
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
-    private let recognizer = SFSpeechRecognizer()
+    private var recognizer: SFSpeechRecognizer?
     private var startAttempt = UUID()
 
-    func start(_ onPartial: @escaping (Result<String, Error>) -> Void) {
+    func start(
+        localeIdentifier: String,
+        _ onPartial: @escaping (Result<String, Error>) -> Void
+    ) {
         let attempt = UUID()
         startAttempt = attempt
         SFSpeechRecognizer.requestAuthorization { status in
@@ -495,13 +512,26 @@ final class SpeechCapture: ObservableObject {
                     )))
                     return
                 }
-                self.begin(onPartial: onPartial)
+                self.begin(localeIdentifier: localeIdentifier, onPartial: onPartial)
             }
         }
     }
 
-    private func begin(onPartial: @escaping (Result<String, Error>) -> Void) {
+    private func begin(
+        localeIdentifier: String,
+        onPartial: @escaping (Result<String, Error>) -> Void
+    ) {
         stop(cancelRecognition: true)
+        guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)),
+              recognizer.isAvailable else {
+            onPartial(.failure(NSError(
+                domain: "VibeSignal",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Speech recognition is unavailable for this language"]
+            )))
+            return
+        }
+        self.recognizer = recognizer
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         self.request = request
@@ -529,7 +559,7 @@ final class SpeechCapture: ObservableObject {
             return
         }
 
-        task = recognizer?.recognitionTask(with: request) { result, error in
+        task = recognizer.recognitionTask(with: request) { result, error in
             if let result {
                 onPartial(.success(result.bestTranscription.formattedString))
             } else if let error {
@@ -556,5 +586,6 @@ final class SpeechCapture: ObservableObject {
         }
         request = nil
         task = nil
+        recognizer = nil
     }
 }

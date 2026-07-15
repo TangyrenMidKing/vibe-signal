@@ -248,6 +248,7 @@ export class ConnectorServer {
         url.searchParams.get("timeout_ms") ?? this.permissionTimeoutMs
       );
       const decision = await this.decisions.waitPermission(turnId, timeoutMs);
+      this.clearExpiredDecisionState(turnId, "waiting", decision.decision);
       this.json(res, 200, decision);
       return;
     }
@@ -258,11 +259,32 @@ export class ConnectorServer {
         url.searchParams.get("timeout_ms") ?? this.stopTimeoutMs
       );
       const decision = await this.decisions.waitStop(turnId, timeoutMs);
+      this.clearExpiredDecisionState(turnId, "completed", decision.decision);
       this.json(res, 200, decision);
       return;
     }
 
     this.json(res, 404, { ok: false, error: "not found" });
+  }
+
+  /**
+   * The phone should never keep offering actions after a hook's decision
+   * window has expired. Only reset the exact turn that timed out—new Codex
+   * activity may already have updated the state while the request was open.
+   */
+  private clearExpiredDecisionState(
+    turnId: string,
+    expectedState: "waiting" | "completed",
+    decision: string
+  ): void {
+    const current = this.state.get();
+    if (
+      decision === "timeout" &&
+      current.turnId === turnId &&
+      current.state === expectedState
+    ) {
+      this.state.setState("idle", "Waiting for agent");
+    }
   }
 
   private json(res: http.ServerResponse, status: number, body: object): void {

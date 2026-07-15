@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import WatchConnectivity
 import WatchKit
+import AVFoundation
 
 @MainActor
 final class WatchModel: NSObject, ObservableObject {
@@ -10,7 +11,9 @@ final class WatchModel: NSObject, ObservableObject {
     @Published var phoneReachable = false
 
     private var lastHapticState: AgentState?
+    private var lastSpokenResponseTimestamp: Int64?
     private var session: WCSession?
+    private let synthesizer = AVSpeechSynthesizer()
 
     func start() {
         guard WCSession.isSupported() else { return }
@@ -34,10 +37,32 @@ final class WatchModel: NSObject, ObservableObject {
             if prev != snap.state {
                 playHaptic(for: snap.state)
             }
+            if snap.state == .completed, lastSpokenResponseTimestamp != snap.ts {
+                lastSpokenResponseTimestamp = snap.ts
+                speak(snap.detail)
+            }
         }
         if let connected = dict[WCKeys.connected] as? Bool {
             phoneConnected = connected
         }
+    }
+
+    func replayResponse() {
+        speak(snapshot.detail)
+    }
+
+    func stopSpeaking() {
+        synthesizer.stopSpeaking(at: .immediate)
+    }
+
+    private func speak(_ response: String) {
+        let text = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        synthesizer.speak(utterance)
     }
 
     private func playHaptic(for state: AgentState) {
