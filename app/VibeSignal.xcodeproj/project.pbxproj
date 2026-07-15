@@ -65,7 +65,7 @@
 		24707F7814E70A8D7AC98E53 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		27D1EAC4C0ED5B50155D7531 /* VoicePromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoicePromptView.swift; sourceTree = "<group>"; };
 		2B1C8292E0F6426F4A23BBA7 /* AgentPulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentPulseApp.swift; sourceTree = "<group>"; };
-		51EAB30625AA9A91B6251F00 /* VibeSignal.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = VibeSignal.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		51EAB30625AA9A91B6251F00 /* VibeSignal.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VibeSignal.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		554BC72E648A0D4E9F8FAB5D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		60ADBD641AF94EFC77E2F597 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		85B6C48471D9B932AA7CD68B /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
@@ -205,14 +205,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					429562F691F84341F1026030 = {
-						DevelopmentTeam = "";
-					};
-					9780E3F3452CCF8392822458 = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 9F9FCDCFBA783207F1510CB3 /* Build configuration list for PBXProject "VibeSignal" */;
 			developmentRegion = en;
@@ -305,6 +297,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = Watch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vibesignal.app.watchkitapp;
@@ -444,6 +437,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iOS/AgentPulse.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -461,6 +455,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = Watch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vibesignal.app.watchkitapp;
@@ -477,6 +472,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iOS/AgentPulse.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				LD_RUNPATH_SEARCH_PATHS = (
