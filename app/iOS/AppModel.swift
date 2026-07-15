@@ -11,7 +11,7 @@ final class AppModel: NSObject, ObservableObject {
     @Published var lastError: String?
     @Published var needsPairing = true
 
-    let client = Vibe SignalClient()
+    let client = VibeSignalClient()
     private var cancellables = Set<AnyCancellable>()
     private let defaults = UserDefaults.standard
     private let pairingKey = "agentpulse.pairing"

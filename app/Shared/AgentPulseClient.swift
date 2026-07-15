@@ -1,8 +1,9 @@
 import Foundation
+import Combine
 
 /// Minimal WebSocket client with auto-reconnect for the Vibe Signal LAN protocol.
 @MainActor
-public final class Vibe SignalClient: ObservableObject {
+public final class VibeSignalClient: ObservableObject {
     @Published public private(set) var snapshot = StateSnapshot(state: .idle, detail: "Not connected")
     @Published public private(set) var isConnected = false
     @Published public private(set) var lastError: String?
