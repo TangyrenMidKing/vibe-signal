@@ -93,7 +93,7 @@ struct RootView: View {
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .tracking(-0.02)
                     .foregroundStyle(.white)
-                Text(model.isConnected ? "Linked to desktop" : "Not linked")
+                Text(linkSubtitle)
                     .font(.caption)
                     .foregroundStyle(PulseTheme.mistSoft)
             }
@@ -128,6 +128,12 @@ struct RootView: View {
                     .foregroundStyle(PulseTheme.mist)
             }
         }
+    }
+
+    private var linkSubtitle: String {
+        if model.isConnected { return "Linked to desktop" }
+        if model.pairing != nil { return "Reconnecting…" }
+        return "Not linked"
     }
 
     @ViewBuilder
@@ -198,7 +204,7 @@ struct SignalHero: View {
                     Circle()
                         .fill(connected ? PulseTheme.signal(.completed) : PulseTheme.signal(.idle))
                         .frame(width: 7, height: 7)
-                    Text(connected ? "Live" : "Reconnect from menu")
+                    Text(connected ? "Live" : "Reconnecting…")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(PulseTheme.mistSoft)
                 }

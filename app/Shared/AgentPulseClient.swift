@@ -13,7 +13,9 @@ public final class VibeSignalClient: ObservableObject {
     private var session: URLSession?
     private var reconnectTask: Task<Void, Never>?
     private var shouldRun = false
-    private var pingHandler: (() -> Void)?
+    /// Bumps on every open/close so late callbacks from cancelled sockets are ignored.
+    private var generation = 0
+    private var reconnectAttempt = 0
 
     public var onStateChange: ((StateSnapshot) -> Void)?
 
@@ -22,6 +24,7 @@ public final class VibeSignalClient: ObservableObject {
     public func connect(pairing: PairingPayload) {
         self.pairing = pairing
         shouldRun = true
+        reconnectAttempt = 0
         reconnectTask?.cancel()
         openSocket()
     }
@@ -29,8 +32,12 @@ public final class VibeSignalClient: ObservableObject {
     public func disconnect() {
         shouldRun = false
         reconnectTask?.cancel()
+        reconnectTask = nil
+        generation += 1
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+        session?.invalidateAndCancel()
+        session = nil
         isConnected = false
     }
 
@@ -48,39 +55,66 @@ public final class VibeSignalClient: ObservableObject {
     }
 
     private func openSocket() {
-        task?.cancel(with: .goingAway, reason: nil)
         guard let pairing, let url = pairing.wsURL else {
             lastError = "Invalid pairing"
+            isConnected = false
             return
         }
 
-        let config = URLSessionConfiguration.default
-        config.waitsForConnectivity = true
-        let session = URLSession(configuration: config)
-        self.session = session
-        let task = session.webSocketTask(with: url)
+        generation += 1
+        let gen = generation
+
+        let previous = task
+        task = nil
+        previous?.cancel(with: .goingAway, reason: nil)
+
+        if session == nil {
+            let config = URLSessionConfiguration.default
+            config.waitsForConnectivity = true
+            config.timeoutIntervalForRequest = 30
+            session = URLSession(configuration: config)
+        }
+
+        let task = session!.webSocketTask(with: url)
         self.task = task
+        // Stay "disconnected" in UI until the server sends the initial state
+        // (or any frame). Setting true here raced with cancel callbacks.
         task.resume()
-        isConnected = true
-        lastError = nil
-        receiveLoop()
+        receiveLoop(generation: gen)
     }
 
-    private func receiveLoop() {
-        task?.receive { [weak self] result in
+    private func receiveLoop(generation gen: Int) {
+        guard gen == generation, let task else { return }
+        task.receive { [weak self] result in
             Task { @MainActor in
-                guard let self else { return }
+                guard let self, gen == self.generation else { return }
                 switch result {
                 case .failure(let error):
-                    self.isConnected = false
-                    self.lastError = error.localizedDescription
-                    self.scheduleReconnect()
+                    self.handleDisconnect(error: error, generation: gen)
                 case .success(let message):
+                    if !self.isConnected {
+                        self.isConnected = true
+                        self.lastError = nil
+                        self.reconnectAttempt = 0
+                    }
                     self.handle(message)
-                    self.receiveLoop()
+                    self.receiveLoop(generation: gen)
                 }
             }
         }
+    }
+
+    private func handleDisconnect(error: Error, generation gen: Int) {
+        guard gen == generation else { return }
+        isConnected = false
+        // Cancellation during intentional reconnect is not a user-facing error.
+        let ns = error as NSError
+        let cancelled =
+            ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled
+        if !cancelled {
+            lastError = error.localizedDescription
+        }
+        scheduleReconnect()
     }
 
     private func handle(_ message: URLSessionWebSocketTask.Message) {
@@ -105,8 +139,6 @@ public final class VibeSignalClient: ObservableObject {
                 lastError = nil
             } else {
                 lastError = message ?? "Command failed"
-                // The connector has already closed its hook window. Do not
-                // leave stale Continue/Retry controls on screen.
                 if message?.localizedCaseInsensitiveContains("not waiting") == true {
                     let idle = StateSnapshot(state: .idle, detail: "Waiting for agent")
                     snapshot = idle
@@ -121,8 +153,11 @@ public final class VibeSignalClient: ObservableObject {
     private func scheduleReconnect() {
         guard shouldRun else { return }
         reconnectTask?.cancel()
+        reconnectAttempt += 1
+        // 1s, 2s, 4s… capped at 8s — avoids slam-reconnect flap.
+        let delay = min(8.0, pow(2.0, Double(min(reconnectAttempt, 3)) - 1.0))
         reconnectTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard !Task.isCancelled, shouldRun else { return }
             openSocket()
         }
