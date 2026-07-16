@@ -1,12 +1,8 @@
 import SwiftUI
-import WatchKit
-import AVFoundation
 
 struct WatchStatusView: View {
     @EnvironmentObject private var model: WatchModel
-    @State private var isHoldingSpeak = false
-    @State private var speechError: String?
-    @StateObject private var recorder = WatchAudioCapture()
+    @State private var showingVoice = false
 
     private var disconnected: Bool {
         !model.phoneReachable && model.snapshot.state == .idle
@@ -37,7 +33,7 @@ struct WatchStatusView: View {
 
                 Spacer(minLength: 8)
 
-                Text(speechError ?? (isHoldingSpeak ? "Listening…" : detail))
+                Text(detail)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(PulseTheme.mist)
                     .multilineTextAlignment(.center)
@@ -60,6 +56,12 @@ struct WatchStatusView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+        }
+        .sheet(isPresented: $showingVoice) {
+            VoiceDictationView { text in
+                model.send(.voice_prompt, text: text)
+                showingVoice = false
+            }
         }
     }
 
@@ -100,18 +102,19 @@ struct WatchStatusView: View {
     }
 
     private var speakButton: some View {
-        Label(isHoldingSpeak ? "Listening" : "Hold to speak", systemImage: "mic.fill")
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(PulseTheme.ink)
-            .frame(maxWidth: .infinity)
-            .frame(height: 36)
-            .background(isHoldingSpeak ? PulseTheme.accent.opacity(0.78) : PulseTheme.accent)
-            .clipShape(Capsule())
-            .scaleEffect(isHoldingSpeak ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: isHoldingSpeak)
-            .gesture(holdToTalk)
-            .accessibilityLabel("Hold to speak")
-            .accessibilityHint("Press and hold to dictate; release to send")
+        Button {
+            showingVoice = true
+        } label: {
+            Label("Speak", systemImage: "mic.fill")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(PulseTheme.accent)
+        .buttonBorderShape(.capsule)
+        .accessibilityLabel("Speak")
+        .accessibilityHint("Opens dictation to send a prompt")
     }
 
     private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -123,69 +126,5 @@ struct WatchStatusView: View {
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
-    }
-
-    private var holdToTalk: some Gesture {
-        LongPressGesture(minimumDuration: 0, maximumDistance: 24)
-            .onChanged { _ in beginHold() }
-            .onEnded { _ in endHold() }
-    }
-
-    private func beginHold() {
-        guard !isHoldingSpeak else { return }
-        speechError = nil
-        do {
-            try recorder.start()
-            isHoldingSpeak = true
-            WKInterfaceDevice.current().play(.start)
-        } catch {
-            speechError = error.localizedDescription
-        }
-    }
-
-    private func endHold() {
-        guard isHoldingSpeak else { return }
-        isHoldingSpeak = false
-        WKInterfaceDevice.current().play(.click)
-        guard let recording = recorder.stop() else { return }
-        model.sendVoiceRecording(recording)
-    }
-}
-
-@MainActor
-private final class WatchAudioCapture: ObservableObject {
-    private var recorder: AVAudioRecorder?
-    private var recordingURL: URL?
-
-    func start() throws {
-        _ = stop()
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .default, options: [])
-        try session.setActive(true)
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("watch-prompt-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 16_000,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
-        ]
-        let recorder = try AVAudioRecorder(url: url, settings: settings)
-        recorder.prepareToRecord()
-        guard recorder.record() else {
-            throw NSError(domain: "VibeSignal", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not start recording"])
-        }
-        self.recorder = recorder
-        recordingURL = url
-    }
-
-    func stop() -> URL? {
-        guard let recorder, recorder.isRecording else { return nil }
-        recorder.stop()
-        self.recorder = nil
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        defer { recordingURL = nil }
-        return recordingURL
     }
 }

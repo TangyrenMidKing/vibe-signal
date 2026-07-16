@@ -28,31 +28,33 @@ final class WatchModel: NSObject, ObservableObject {
             WKInterfaceDevice.current().play(.failure)
             return
         }
-        guard let session, session.isReachable else { return }
-        var msg: [String: Any] = [WCKeys.command: command.rawValue]
-        if let text { msg[WCKeys.text] = text }
-        session.sendMessage(msg, replyHandler: nil) { _ in }
-    }
-
-    func sendVoiceRecording(_ url: URL) {
-        guard phoneConnected, let session else {
+        guard let session, session.isReachable else {
             WKInterfaceDevice.current().play(.failure)
-            try? FileManager.default.removeItem(at: url)
             return
         }
-        session.transferFile(url, metadata: [WCKeys.command: AgentCommand.voice_prompt.rawValue])
+        var msg: [String: Any] = [WCKeys.command: command.rawValue]
+        if let text { msg[WCKeys.text] = text }
+        session.sendMessage(msg, replyHandler: nil) { _ in
+            Task { @MainActor in
+                WKInterfaceDevice.current().play(.failure)
+            }
+        }
+        WKInterfaceDevice.current().play(.success)
     }
 
     private func isCommandWindowOpen(for command: AgentCommand) -> Bool {
         let ageMs = Int64(Date().timeIntervalSince1970 * 1_000) - snapshot.ts
+        // Reachability is enough for the watch; the connected flag can lag
+        // behind application-context updates from the phone.
+        let linked = phoneReachable || phoneConnected
         switch command {
         case .approve, .deny:
-            return snapshot.state == .waiting && ageMs < 115_000
+            return linked && snapshot.state == .waiting && ageMs < 115_000
         case .continue, .retry:
-            return snapshot.state == .completed && ageMs < 295_000
+            return linked && snapshot.state == .completed && ageMs < 295_000
         case .voice_prompt:
             // One thread only: inject into a paused turn, or start when idle.
-            guard phoneConnected else { return false }
+            guard linked else { return false }
             switch snapshot.state {
             case .idle, .completed, .error:
                 return true
@@ -142,14 +144,6 @@ extension WatchModel: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in apply(message) }
-    }
-
-    nonisolated func session(
-        _ session: WCSession,
-        didFinish fileTransfer: WCSessionFileTransfer,
-        error: Error?
-    ) {
-        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
