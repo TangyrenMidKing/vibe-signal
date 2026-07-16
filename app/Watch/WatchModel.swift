@@ -34,6 +34,15 @@ final class WatchModel: NSObject, ObservableObject {
         session.sendMessage(msg, replyHandler: nil) { _ in }
     }
 
+    func sendVoiceRecording(_ url: URL) {
+        guard phoneConnected, let session else {
+            WKInterfaceDevice.current().play(.failure)
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        session.transferFile(url, metadata: [WCKeys.command: AgentCommand.voice_prompt.rawValue])
+    }
+
     private func isCommandWindowOpen(for command: AgentCommand) -> Bool {
         let ageMs = Int64(Date().timeIntervalSince1970 * 1_000) - snapshot.ts
         switch command {
@@ -126,6 +135,14 @@ extension WatchModel: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in apply(message) }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {

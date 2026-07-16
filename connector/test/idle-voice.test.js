@@ -33,3 +33,14 @@ test("voice prompt starts a Codex turn when no Stop hook is active", async () =>
   assert.equal(started.length, 1);
   assert.equal(started[0].prompt, "Inspect the failing tests");
 });
+
+test("a missing Stop hook does not leave the connector working forever", async () => {
+  const state = new StateMachine({ workingTimeoutMs: 20 });
+  state.setState("working", "Running tests");
+
+  await new Promise((resolve) => setTimeout(resolve, 50));
+
+  assert.equal(state.get().state, "idle");
+  assert.equal(state.get().detail, "Waiting for agent");
+  state.dispose();
+});

@@ -21,15 +21,27 @@ export interface StateMeta {
   cwd?: string;
 }
 
+export interface StateMachineOptions {
+  /** Reset a stale active turn when its terminal Stop hook never arrives. */
+  workingTimeoutMs?: number;
+}
+
 /**
  * Maps Codex hook / simulator events into the four Vibe Signal UI states.
  */
 export class StateMachine extends EventEmitter {
+  private readonly workingTimeoutMs: number;
+  private workingTimeout?: NodeJS.Timeout;
   private current: InternalState = {
     state: "idle",
     detail: "Waiting for agent",
     ts: Date.now(),
   };
+
+  constructor(options: StateMachineOptions = {}) {
+    super();
+    this.workingTimeoutMs = Math.max(1, options.workingTimeoutMs ?? 600_000);
+  }
 
   getSnapshot(): StateSnapshot {
     return {
@@ -50,6 +62,7 @@ export class StateMachine extends EventEmitter {
   }
 
   setState(state: AgentState, detail: string, meta?: StateMeta): StateSnapshot {
+    this.clearWorkingTimeout();
     this.current = {
       state,
       detail,
@@ -62,7 +75,30 @@ export class StateMachine extends EventEmitter {
     };
     const snap = this.getSnapshot();
     this.emit("change", snap);
+    if (state === "working") {
+      this.scheduleWorkingTimeout(snap.ts);
+    }
     return snap;
+  }
+
+  dispose(): void {
+    this.clearWorkingTimeout();
+  }
+
+  private scheduleWorkingTimeout(ts: number): void {
+    this.workingTimeout = setTimeout(() => {
+      if (this.current.state === "working" && this.current.ts === ts) {
+        this.setState("idle", "Waiting for agent");
+      }
+    }, this.workingTimeoutMs);
+    this.workingTimeout.unref();
+  }
+
+  private clearWorkingTimeout(): void {
+    if (this.workingTimeout) {
+      clearTimeout(this.workingTimeout);
+      this.workingTimeout = undefined;
+    }
   }
 
   /**

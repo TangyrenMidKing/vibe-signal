@@ -4,6 +4,10 @@ out/
 .DS_Store
 *.xcuserdata
 *.xcworkspace/xcuserdata
+*.xcuserstate
+# Xcode build products and local workspace metadata
+build/
+xcuserdata/
 DerivedData/
 .build/
 .env

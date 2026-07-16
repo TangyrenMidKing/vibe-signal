@@ -1,116 +1,191 @@
 import SwiftUI
+import WatchKit
+import AVFoundation
 
 struct WatchStatusView: View {
     @EnvironmentObject private var model: WatchModel
-    @State private var showingVoice = false
+    @State private var isHoldingSpeak = false
+    @State private var speechError: String?
+    @StateObject private var recorder = WatchAudioCapture()
 
     private var disconnected: Bool {
         !model.phoneReachable && model.snapshot.state == .idle
     }
 
+    private var state: AgentState {
+        disconnected ? .idle : model.snapshot.state
+    }
+
     private var signal: Color {
-        disconnected ? PulseTheme.signal(.idle) : PulseTheme.signal(model.snapshot.state)
+        PulseTheme.signal(state)
+    }
+
+    private var headline: String {
+        disconnected ? "Offline" : state.title
+    }
+
+    private var detail: String {
+        disconnected ? "Open Vibe Signal on iPhone" : model.snapshot.state.pulseLabel
     }
 
     var body: some View {
         ZStack {
             PulseTheme.ink.ignoresSafeArea()
-            RadialGradient(
-                colors: [signal.opacity(0.55), PulseTheme.ink.opacity(0.2)],
-                center: .center,
-                startRadius: 4,
-                endRadius: 90
-            )
-            .ignoresSafeArea()
-            .animation(.easeInOut(duration: 0.35), value: model.snapshot.state)
 
-            VStack(spacing: 6) {
-                Circle()
-                    .fill(signal)
-                    .frame(width: 14, height: 14)
-                    .shadow(color: signal.opacity(0.7), radius: 6)
+            VStack(spacing: 0) {
+                statusHeader
 
-                Text(disconnected ? "OFFLINE" : model.snapshot.state.title.uppercased())
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .tracking(1.2)
-                    .foregroundStyle(.white)
+                Spacer(minLength: 8)
 
-                Text(disconnected ? "Open iPhone" : model.snapshot.state.pulseLabel)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .multilineTextAlignment(.center)
+                Text(speechError ?? (isHoldingSpeak ? "Listening…" : detail))
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(PulseTheme.mist)
-                    .lineLimit(1)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .padding(.horizontal, 8)
 
-                if !disconnected {
-                    if let project = model.snapshot.project, !project.isEmpty {
-                        Text(project)
-                            .font(.system(size: 10, weight: .semibold, design: .rounded))
-                            .foregroundStyle(PulseTheme.accent)
-                            .lineLimit(1)
-                    }
-                    if let repo = model.snapshot.repo,
-                       !repo.isEmpty,
-                       repo != model.snapshot.project {
-                        Text(repo)
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                            .foregroundStyle(PulseTheme.mistSoft)
-                            .lineLimit(1)
-                    }
+                if let project = model.snapshot.project, !project.isEmpty, !disconnected {
+                    Text(project)
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(PulseTheme.mistSoft)
+                        .lineLimit(1)
+                        .padding(.top, 5)
                 }
+
+                Spacer(minLength: 10)
 
                 if !disconnected {
                     controls
-                        .padding(.top, 4)
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .sheet(isPresented: $showingVoice) {
-            VoiceDictationView { text in
-                model.send(.voice_prompt, text: text)
-                showingVoice = false
-            }
+    }
+
+    private var statusHeader: some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(signal)
+                .frame(width: 8, height: 8)
+                .shadow(color: signal.opacity(0.6), radius: 4)
+
+            Text(headline.uppercased())
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(.white)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private var controls: some View {
         switch model.snapshot.state {
         case .waiting:
-            HStack(spacing: 6) {
-                Button("OK") { model.send(.approve) }
+            HStack(spacing: 7) {
+                actionButton("Approve", icon: "checkmark") { model.send(.approve) }
                     .tint(PulseTheme.signal(.completed))
-                Button("No") { model.send(.deny) }
+                actionButton("Decline", icon: "xmark") { model.send(.deny) }
                     .tint(PulseTheme.signal(.working))
             }
-            .font(.caption2.weight(.semibold))
         case .completed, .error:
-            HStack(spacing: 6) {
-                Button("Go") { model.send(.continue) }
+            HStack(spacing: 7) {
+                actionButton("Continue", icon: "arrow.right") { model.send(.continue) }
                     .tint(PulseTheme.accent)
-                Button("Mic") { showingVoice = true }
-                Button {
-                    model.replayResponse()
-                } label: {
-                    Image(systemName: "speaker.wave.2.fill")
-                }
-                .tint(PulseTheme.accent)
-                Button {
-                    model.stopSpeaking()
-                } label: {
-                    Image(systemName: "stop.fill")
-                }
-                .tint(PulseTheme.mist)
+                speakButton
             }
-            .font(.caption2.weight(.semibold))
         default:
-            Button {
-                showingVoice = true
-            } label: {
-                Image(systemName: "mic.fill")
-            }
-            .tint(PulseTheme.accent)
-            .font(.caption)
+            speakButton
         }
+    }
+
+    private var speakButton: some View {
+        Label(isHoldingSpeak ? "Listening" : "Hold to speak", systemImage: "mic.fill")
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(PulseTheme.ink)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(isHoldingSpeak ? PulseTheme.accent.opacity(0.78) : PulseTheme.accent)
+            .clipShape(Capsule())
+            .scaleEffect(isHoldingSpeak ? 0.97 : 1)
+            .animation(.easeOut(duration: 0.12), value: isHoldingSpeak)
+            .gesture(holdToTalk)
+            .accessibilityLabel("Hold to speak")
+            .accessibilityHint("Press and hold to dictate; release to send")
+    }
+
+    private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .frame(height: 34)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+    }
+
+    private var holdToTalk: some Gesture {
+        LongPressGesture(minimumDuration: 0, maximumDistance: 24)
+            .onChanged { _ in beginHold() }
+            .onEnded { _ in endHold() }
+    }
+
+    private func beginHold() {
+        guard !isHoldingSpeak else { return }
+        speechError = nil
+        do {
+            try recorder.start()
+            isHoldingSpeak = true
+            WKInterfaceDevice.current().play(.start)
+        } catch {
+            speechError = error.localizedDescription
+        }
+    }
+
+    private func endHold() {
+        guard isHoldingSpeak else { return }
+        isHoldingSpeak = false
+        WKInterfaceDevice.current().play(.click)
+        guard let recording = recorder.stop() else { return }
+        model.sendVoiceRecording(recording)
+    }
+}
+
+@MainActor
+private final class WatchAudioCapture: ObservableObject {
+    private var recorder: AVAudioRecorder?
+    private var recordingURL: URL?
+
+    func start() throws {
+        _ = stop()
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .default, options: [])
+        try session.setActive(true)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("watch-prompt-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 16_000,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        let recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder.prepareToRecord()
+        guard recorder.record() else {
+            throw NSError(domain: "VibeSignal", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not start recording"])
+        }
+        self.recorder = recorder
+        recordingURL = url
+    }
+
+    func stop() -> URL? {
+        guard let recorder, recorder.isRecording else { return nil }
+        recorder.stop()
+        self.recorder = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        defer { recordingURL = nil }
+        return recordingURL
     }
 }

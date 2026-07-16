@@ -114,6 +114,11 @@
           "type": "number",
           "default": 300000,
           "description": "How long hooks wait for Continue/voice after a turn completes."
+        },
+        "agentpulse.workingTimeoutMs": {
+          "type": "number",
+          "default": 600000,
+          "description": "Reset to Idle when no agent activity or Stop hook arrives within this time."
         }
       }
     }
@@ -121,7 +126,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "test": "npm run compile && node --test \"test/*.test.js\"",
+    "test": "npm run compile && node --test test/*.test.js",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },

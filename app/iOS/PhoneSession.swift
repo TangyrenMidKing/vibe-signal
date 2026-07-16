@@ -71,4 +71,19 @@ final class PhoneSession: NSObject, WCSessionDelegate {
             appModel?.handleWatchCommand(command, text: text)
         }
     }
+
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        guard file.metadata?[WCKeys.command] as? String == AgentCommand.voice_prompt.rawValue else { return }
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("watch-prompt-\(UUID().uuidString)")
+            .appendingPathExtension(file.fileURL.pathExtension)
+        do {
+            try FileManager.default.copyItem(at: file.fileURL, to: destination)
+        } catch {
+            return
+        }
+        Task { @MainActor in
+            appModel?.handleWatchRecording(at: destination)
+        }
+    }
 }

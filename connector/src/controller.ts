@@ -58,7 +58,10 @@ export class ConnectorController extends EventEmitter {
   constructor(context: vscode.ExtensionContext) {
     super();
     this.context = context;
-    this.state = new StateMachine();
+    const workingTimeoutMs = vscode.workspace
+      .getConfiguration("agentpulse")
+      .get<number>("workingTimeoutMs") ?? 600_000;
+    this.state = new StateMachine({ workingTimeoutMs });
     this.decisions = new DecisionHub();
     this.token = context.globalState.get<string>(TOKEN_KEY) ?? "";
     if (!this.token) {
@@ -210,6 +213,7 @@ export class ConnectorController extends EventEmitter {
 
   async dispose(): Promise<void> {
     await this.stop();
+    this.state.dispose();
   }
 
   private readPort(): number {

@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import UserNotifications
 import WatchConnectivity
+import Speech
 
 enum SpeechLanguage: String, CaseIterable, Identifiable {
     case system
@@ -51,6 +52,7 @@ final class AppModel: NSObject, ObservableObject {
     private let defaults = UserDefaults.standard
     private let pairingKey = "agentpulse.pairing"
     private let speechLanguageKey = "vibesignal.speechLanguage"
+    private var watchSpeechTask: SFSpeechRecognitionTask?
 
     private lazy var phoneSession: PhoneSession = PhoneSession(appModel: self)
 
@@ -120,6 +122,37 @@ final class AppModel: NSObject, ObservableObject {
 
     func handleWatchCommand(_ command: AgentCommand, text: String?) {
         send(command, text: text)
+    }
+
+    func handleWatchRecording(at url: URL) {
+        SFSpeechRecognizer.requestAuthorization { [weak self] status in
+            Task { @MainActor in
+                guard let self else { return }
+                guard status == .authorized else {
+                    self.lastError = "Speech permission is required to send a watch voice message."
+                    return
+                }
+                guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: self.speechLanguage.localeIdentifier)),
+                      recognizer.isAvailable else {
+                    self.lastError = "Speech recognition is unavailable for the selected language."
+                    return
+                }
+                self.watchSpeechTask?.cancel()
+                let request = SFSpeechURLRecognitionRequest(url: url)
+                self.watchSpeechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                    guard let self else { return }
+                    if let result, result.isFinal {
+                        self.send(.voice_prompt, text: result.bestTranscription.formattedString)
+                        try? FileManager.default.removeItem(at: url)
+                        self.watchSpeechTask = nil
+                    } else if let error {
+                        self.lastError = error.localizedDescription
+                        try? FileManager.default.removeItem(at: url)
+                        self.watchSpeechTask = nil
+                    }
+                }
+            }
+        }
     }
 
     private func connect(_ payload: PairingPayload) {
