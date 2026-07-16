@@ -2,6 +2,39 @@
 
 `app/` is **source code**, not an App Store build. You need a **Mac + Xcode** to compile and install on a physical iPhone (Simulator cannot scan the pairing QR).
 
+## How it works
+
+```
+Codex CLI  ──hooks──►  Connector (VS Code / Cursor)  ◄──WebSocket──►  iPhone
+                              │                                         │
+                         localhost HTTP                          WatchConnectivity
+                         (hooks only)                                   │
+                                                                      Watch
+```
+
+1. **Desktop connector** (the Vibe Signal extension) runs a small server on your PC.
+2. **Codex hooks** POST lifecycle events to that server on **localhost** and long-poll for Approve / Continue / voice decisions.
+3. **iPhone** connects over your **LAN Wi‑Fi** via WebSocket, shows agent state, and sends commands (approve, deny, continue, hold-to-talk).
+4. **Apple Watch** (optional) talks only to the iPhone over WatchConnectivity — it does not open its own socket to the PC.
+
+There is no cloud relay in MVP. Phone and PC must be on the same network.
+
+### Port
+
+| Path | Default | Who uses it | Configurable |
+|------|---------|-------------|--------------|
+| **LAN WebSocket + health** | **`8787`** | iPhone → `ws://<lan-ip>:8787/?token=…` | VS Code / Cursor setting `agentpulse.port` |
+| Hook HTTP | same port | Codex hook → `http://127.0.0.1:8787/…` (localhost only) | same setting |
+
+- The connector binds **`0.0.0.0:8787`** so phones on the LAN can reach it.
+- Pairing QR / JSON always includes the PC’s **LAN IP** and this port (never `127.0.0.1` for the phone).
+- Firewall: allow inbound **TCP 8787** on the PC if the phone cannot connect.
+- Health check on the desktop: `http://127.0.0.1:8787/health`
+
+Wire format details: see root [`PROTOCOL.md`](../PROTOCOL.md).
+
+---
+
 ## Requirements
 
 | Need | Notes |
@@ -133,6 +166,9 @@ On first use, allow:
 
 **Press and hold** the mic to speak; **release** to send the transcript to the agent.
 
+- While a Codex turn is in **`completed`** (Stop hook waiting): voice is injected as the next prompt.
+- From **`idle`**: the connector starts or resumes a Codex exec turn with that text.
+
 ---
 
 ## Common errors
@@ -145,6 +181,7 @@ On first use, allow:
 | Device grayed out | Cable + Trust Computer; Xcode → Window → Devices and Simulators |
 | `xcodegen: command not found` | `brew install xcodegen` |
 | Watch signing fails | Fix Watch target Team, or ship iPhone-only first |
+| Phone stuck “Reconnecting…” | Connector On; same Wi‑Fi; firewall allows **8787**; re-scan QR |
 
 ---
 

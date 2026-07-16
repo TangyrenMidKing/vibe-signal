@@ -2,7 +2,7 @@
   "name": "vibe-signal",
   "displayName": "Vibe Signal",
   "description": "Keep your AI coding agent connected to your Apple Watch and iPhone.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "ShiboDing",
   "license": "MIT",
   "icon": "media/icon.png",
