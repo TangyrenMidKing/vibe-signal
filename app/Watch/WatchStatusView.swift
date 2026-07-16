@@ -30,7 +30,7 @@ struct WatchStatusView: View {
             // Soft full-screen wash per state (muted so text stays readable).
             PulseTheme.ink.ignoresSafeArea()
             signal
-                .opacity(0.20)
+                .opacity(0.5)
                 .ignoresSafeArea()
                 .animation(.easeInOut(duration: 0.35), value: state)
 
