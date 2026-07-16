@@ -25,16 +25,21 @@ final class PhoneSession: NSObject, WCSessionDelegate {
 
         var payload = state.wcPayload
         payload[WCKeys.connected] = connected
+        // WatchConnectivity drops oversized contexts; keep a speakable reply slice.
+        if let detail = payload[WCKeys.detail] as? String, detail.count > 900 {
+            payload[WCKeys.detail] = String(detail.prefix(900))
+        }
+
+        // Prefer a live message for completed replies so the watch can TTS immediately.
+        if session.isReachable {
+            session.sendMessage(payload, replyHandler: nil) { _ in }
+        }
 
         // Watch may disappear between the guard and this call; swallow that.
         do {
             try session.updateApplicationContext(payload)
         } catch {
-            // WCErrorCodeWatchAppNotInstalled / not reachable — ignore.
-        }
-
-        if session.isReachable {
-            session.sendMessage(payload, replyHandler: nil) { _ in }
+            // WCErrorCodeWatchAppNotInstalled / payload too large — ignore.
         }
     }
 

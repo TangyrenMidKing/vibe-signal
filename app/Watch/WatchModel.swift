@@ -89,9 +89,14 @@ final class WatchModel: NSObject, ObservableObject {
             if prev != snap.state {
                 playHaptic(for: snap.state)
             }
+            // Read the assistant reply aloud when a turn completes.
             if snap.state == .completed, lastSpokenResponseTimestamp != snap.ts {
                 lastSpokenResponseTimestamp = snap.ts
-                speak(snap.detail)
+                // Let haptics / audio-session teardown from recording finish first.
+                let reply = snap.detail
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.speak(reply)
+                }
             }
         }
         if let connected = dict[WCKeys.connected] as? Bool {
@@ -112,12 +117,34 @@ final class WatchModel: NSObject, ObservableObject {
     }
 
     private func speak(_ response: String) {
-        let text = response.trimmingCharacters(in: .whitespacesAndNewlines)
+        var text = response.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
+        // Skip generic placeholders that aren't real replies.
+        let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent"]
+        if skip.contains(text) { return }
+
+        // Keep spoken replies short on-wrist.
+        if text.count > 480 {
+            text = String(text.prefix(480)) + "…"
+        }
+
+        // Recording leaves the shared session in .record / inactive — TTS needs playback.
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            // Still attempt speak; some watches recover without an explicit session.
+        }
+
         synthesizer.stopSpeaking(at: .immediate)
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: Locale.current.identifier)
+        let lang = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
+        utterance.voice =
+            AVSpeechSynthesisVoice(language: lang)
+            ?? AVSpeechSynthesisVoice(language: String(lang.prefix(2)))
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        utterance.volume = 1.0
         synthesizer.speak(utterance)
     }
 
