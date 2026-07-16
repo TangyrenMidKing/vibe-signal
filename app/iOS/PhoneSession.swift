@@ -19,18 +19,21 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         self.session = session
     }
 
-    func push(state: StateSnapshot, connected: Bool) {
+    func push(state: StateSnapshot, connected: Bool, ttsPending: Bool = false) {
         guard canPushToWatch else { return }
         guard let session else { return }
 
         var payload = state.wcPayload
         payload[WCKeys.connected] = connected
+        if ttsPending {
+            payload[WCKeys.ttsPending] = true
+        }
         // WatchConnectivity drops oversized contexts; keep a speakable reply slice.
         if let detail = payload[WCKeys.detail] as? String, detail.count > 900 {
             payload[WCKeys.detail] = String(detail.prefix(900))
         }
 
-        // Prefer a live message for completed replies so the watch can TTS immediately.
+        // Prefer a live message for completed replies so the watch can react immediately.
         if session.isReachable {
             session.sendMessage(payload, replyHandler: nil) { _ in }
         }
@@ -41,6 +44,20 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         } catch {
             // WCErrorCodeWatchAppNotInstalled / payload too large — ignore.
         }
+    }
+
+    func transferSpeakReply(fileURL: URL, stateTs: Int64) {
+        guard canPushToWatch, let session else {
+            try? FileManager.default.removeItem(at: fileURL)
+            return
+        }
+        session.transferFile(
+            fileURL,
+            metadata: [
+                WCKeys.command: WCKeys.speakReply,
+                WCKeys.ts: stateTs
+            ]
+        )
     }
 
     func notifyWatchSpeechError(_ message: String) {
@@ -98,5 +115,13 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         Task { @MainActor in
             appModel?.handleWatchRecording(at: destination)
         }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
     }
 }

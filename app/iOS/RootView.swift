@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var showPairing = false
     @State private var showManual = false
     @State private var showFeedback = false
+    @State private var showOpenAIKey = false
     @State private var appear = false
 
     var body: some View {
@@ -74,6 +75,19 @@ struct RootView: View {
         .sheet(isPresented: $showFeedback) {
             FeedbackLogView(text: model.snapshot.detail)
         }
+        .sheet(isPresented: $showOpenAIKey) {
+            OpenAIKeyView(
+                hasKey: model.hasOpenAIKey,
+                onSave: { key in
+                    model.setOpenAIAPIKey(key)
+                    showOpenAIKey = false
+                },
+                onClear: {
+                    model.clearOpenAIAPIKey()
+                    showOpenAIKey = false
+                }
+            )
+        }
         .onAppear {
             appear = true
             if model.needsPairing {
@@ -115,6 +129,28 @@ struct RootView: View {
                         }
                     }
                 }
+                Divider()
+                Button(
+                    model.hasOpenAIKey ? "OpenAI API Key ✓" : "OpenAI API Key…",
+                    systemImage: "key.fill"
+                ) {
+                    showOpenAIKey = true
+                }
+                Menu("Watch reply voice", systemImage: "speaker.wave.2.fill") {
+                    ForEach(OpenAIVoice.allCases) { voice in
+                        Button {
+                            model.setOpenAIVoice(voice)
+                        } label: {
+                            Label(
+                                voice.title,
+                                systemImage: model.openAIVoice == voice
+                                    ? "checkmark"
+                                    : "circle"
+                            )
+                        }
+                    }
+                }
+                .disabled(!model.hasOpenAIKey)
                 if model.pairing != nil {
                     Divider()
                     Button("Disconnect", systemImage: "xmark.circle", role: .destructive) {

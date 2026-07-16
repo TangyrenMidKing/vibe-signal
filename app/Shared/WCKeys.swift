@@ -14,6 +14,10 @@ public enum WCKeys {
     public static let command = "command"
     public static let text = "text"
     public static let speechError = "speechError"
+    /// File transfer: OpenAI TTS mp3 for Watch playback.
+    public static let speakReply = "speak_reply"
+    /// State push hint: phone is generating OpenAI TTS; Watch should delay local speech.
+    public static let ttsPending = "ttsPending"
 }
 
 public extension StateSnapshot {

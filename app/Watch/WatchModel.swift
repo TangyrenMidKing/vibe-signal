@@ -13,8 +13,10 @@ final class WatchModel: NSObject, ObservableObject {
 
     private var lastHapticState: AgentState?
     private var lastSpokenResponseTimestamp: Int64?
+    private var pendingLocalSpeakTs: Int64?
     private var session: WCSession?
     private let synthesizer = AVSpeechSynthesizer()
+    private var replyPlayer: AVAudioPlayer?
 
     func start() {
         guard WCSession.isSupported() else { return }
@@ -83,20 +85,16 @@ final class WatchModel: NSObject, ObservableObject {
     }
 
     func apply(_ dict: [String: Any]) {
+        let ttsPending = dict[WCKeys.ttsPending] as? Bool ?? false
         if let snap = StateSnapshot.fromWC(dict) {
             let prev = snapshot.state
             snapshot = snap
             if prev != snap.state {
                 playHaptic(for: snap.state)
             }
-            // Read the assistant reply aloud when a turn completes.
+            // Prefer OpenAI TTS audio from iPhone; fall back to on-watch speech.
             if snap.state == .completed, lastSpokenResponseTimestamp != snap.ts {
-                lastSpokenResponseTimestamp = snap.ts
-                // Let haptics / audio-session teardown from recording finish first.
-                let reply = snap.detail
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.speak(reply)
-                }
+                scheduleReplySpeech(detail: snap.detail, ts: snap.ts, preferOpenAI: ttsPending)
             }
         }
         if let connected = dict[WCKeys.connected] as? Bool {
@@ -105,39 +103,83 @@ final class WatchModel: NSObject, ObservableObject {
         if let error = dict[WCKeys.speechError] as? String, !error.isEmpty {
             speechError = error
             WKInterfaceDevice.current().play(.failure)
+            // TTS failed on phone — speak locally if we were waiting for audio.
+            if let ts = pendingLocalSpeakTs, ts == snapshot.ts {
+                speakLocal(snapshot.detail, ts: ts)
+            }
+        }
+    }
+
+    func playReplyAudio(at url: URL, ts: Int64) {
+        // Cancel local fallback for this reply.
+        if pendingLocalSpeakTs == ts {
+            pendingLocalSpeakTs = nil
+        }
+        lastSpokenResponseTimestamp = ts
+        stopSpeaking()
+
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try session.setActive(true)
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.prepareToPlay()
+            player.volume = 1
+            replyPlayer = player
+            guard player.play() else {
+                speakLocal(snapshot.detail, ts: ts)
+                return
+            }
+            WKInterfaceDevice.current().play(.success)
+            speechError = nil
+        } catch {
+            speechError = "Couldn't play reply audio"
+            speakLocal(snapshot.detail, ts: ts)
         }
     }
 
     func replayResponse() {
-        speak(snapshot.detail)
+        speakLocal(snapshot.detail, ts: snapshot.ts)
     }
 
     func stopSpeaking() {
         synthesizer.stopSpeaking(at: .immediate)
+        replyPlayer?.stop()
+        replyPlayer = nil
     }
 
-    private func speak(_ response: String) {
+    private func scheduleReplySpeech(detail: String, ts: Int64, preferOpenAI: Bool) {
+        lastSpokenResponseTimestamp = ts
+        pendingLocalSpeakTs = ts
+        let delay: TimeInterval = preferOpenAI ? 8.0 : 0.35
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self else { return }
+            // Still waiting for OpenAI audio / not spoken yet.
+            guard self.pendingLocalSpeakTs == ts else { return }
+            self.speakLocal(detail, ts: ts)
+        }
+    }
+
+    private func speakLocal(_ response: String, ts: Int64) {
+        guard pendingLocalSpeakTs == ts || lastSpokenResponseTimestamp == ts else { return }
+        pendingLocalSpeakTs = nil
+
         var text = response.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        // Skip generic placeholders that aren't real replies.
         let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent"]
         if skip.contains(text) { return }
-
-        // Keep spoken replies short on-wrist.
         if text.count > 480 {
             text = String(text.prefix(480)) + "…"
         }
 
-        // Recording leaves the shared session in .record / inactive — TTS needs playback.
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
             try session.setActive(true)
-        } catch {
-            // Still attempt speak; some watches recover without an explicit session.
-        }
+        } catch {}
 
         synthesizer.stopSpeaking(at: .immediate)
+        replyPlayer?.stop()
         let utterance = AVSpeechUtterance(string: text)
         let lang = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
         utterance.voice =
@@ -193,6 +235,24 @@ extension WatchModel: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in apply(message) }
+    }
+
+    nonisolated func session(_ session: WCSession, didReceive file: WCSessionFile) {
+        let command = file.metadata?[WCKeys.command] as? String
+        guard command == WCKeys.speakReply else { return }
+        let ts = (file.metadata?[WCKeys.ts] as? NSNumber)?.int64Value
+            ?? Int64(Date().timeIntervalSince1970 * 1_000)
+        let destination = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reply-\(ts)-\(UUID().uuidString)")
+            .appendingPathExtension(file.fileURL.pathExtension.isEmpty ? "mp3" : file.fileURL.pathExtension)
+        do {
+            try FileManager.default.copyItem(at: file.fileURL, to: destination)
+        } catch {
+            return
+        }
+        Task { @MainActor in
+            playReplyAudio(at: destination, ts: ts)
+        }
     }
 
     nonisolated func session(

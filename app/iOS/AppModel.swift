@@ -51,6 +51,8 @@ final class AppModel: NSObject, ObservableObject {
     @Published var lastError: String?
     @Published var needsPairing = true
     @Published var speechLanguage: SpeechLanguage = .system
+    @Published var openAIVoice: OpenAIVoice = OpenAITTS.voice
+    @Published var hasOpenAIKey: Bool = OpenAITTS.hasAPIKey
 
     let client = VibeSignalClient()
     private var cancellables = Set<AnyCancellable>()
@@ -58,12 +60,16 @@ final class AppModel: NSObject, ObservableObject {
     private let pairingKey = "agentpulse.pairing"
     private let speechLanguageKey = "vibesignal.speechLanguage"
     private var watchSpeechTask: SFSpeechRecognitionTask?
+    private var lastTTSTimestamp: Int64?
+    private var ttsTask: Task<Void, Never>?
 
     private lazy var phoneSession: PhoneSession = PhoneSession(appModel: self)
 
     func start() {
         loadPairing()
         loadSpeechLanguage()
+        hasOpenAIKey = OpenAITTS.hasAPIKey
+        openAIVoice = OpenAITTS.voice
         requestNotificationPermission()
         phoneSession.activate()
 
@@ -73,9 +79,17 @@ final class AppModel: NSObject, ObservableObject {
                 guard let self else { return }
                 let prev = self.snapshot.state
                 self.snapshot = snap
-                self.phoneSession.push(state: snap, connected: self.isConnected)
+                let useOpenAITTS = snap.state == .completed && OpenAITTS.hasAPIKey
+                self.phoneSession.push(
+                    state: snap,
+                    connected: self.isConnected,
+                    ttsPending: useOpenAITTS
+                )
                 if prev != snap.state {
                     self.notifyIfNeeded(snap)
+                    if snap.state == .completed {
+                        self.speakReplyToWatchIfNeeded(snap)
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -210,6 +224,63 @@ final class AppModel: NSObject, ObservableObject {
     func setSpeechLanguage(_ language: SpeechLanguage) {
         speechLanguage = language
         defaults.set(language.rawValue, forKey: speechLanguageKey)
+    }
+
+    func setOpenAIAPIKey(_ key: String) {
+        OpenAITTS.apiKey = key
+        hasOpenAIKey = OpenAITTS.hasAPIKey
+    }
+
+    func clearOpenAIAPIKey() {
+        OpenAITTS.apiKey = nil
+        hasOpenAIKey = false
+    }
+
+    func setOpenAIVoice(_ voice: OpenAIVoice) {
+        OpenAITTS.voice = voice
+        openAIVoice = voice
+    }
+
+    /// Generate OpenAI TTS on the phone and ship mp3 to the Watch for playback.
+    private func speakReplyToWatchIfNeeded(_ snap: StateSnapshot) {
+        guard snap.state == .completed else { return }
+        guard OpenAITTS.hasAPIKey else { return }
+        guard lastTTSTimestamp != snap.ts else { return }
+        lastTTSTimestamp = snap.ts
+
+        let text = snap.detail.trimmingCharacters(in: .whitespacesAndNewlines)
+        let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent"]
+        guard !text.isEmpty, !skip.contains(text) else { return }
+
+        ttsTask?.cancel()
+        let ts = snap.ts
+        ttsTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let fileURL = try await OpenAITTS.synthesizeToFile(text)
+                guard !Task.isCancelled else {
+                    try? FileManager.default.removeItem(at: fileURL)
+                    return
+                }
+                await MainActor.run {
+                    self.phoneSession.transferSpeakReply(fileURL: fileURL, stateTs: ts)
+                }
+            } catch {
+                await MainActor.run {
+                    // Watch will fall back to on-device speech after ttsPending timeout.
+                    self.lastError = error.localizedDescription
+                    self.phoneSession.notifyWatchSpeechError(
+                        "TTS failed — using Watch voice"
+                    )
+                    // Re-push without ttsPending so Watch can speak locally.
+                    self.phoneSession.push(
+                        state: self.snapshot,
+                        connected: self.isConnected,
+                        ttsPending: false
+                    )
+                }
+            }
+        }
     }
 
     private func isCommandWindowOpen(for command: AgentCommand) -> Bool {
