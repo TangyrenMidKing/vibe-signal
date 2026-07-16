@@ -34,7 +34,12 @@ enum SpeechLanguage: String, CaseIterable, Identifiable {
     }
 
     var localeIdentifier: String {
-        self == .system ? Locale.current.identifier : rawValue
+        guard self != .system else {
+            // SFSpeechRecognizer wants BCP-47 (`en-US`); Locale.current often
+            // returns underscore form (`en_US`) which silently fails.
+            return Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
+        }
+        return rawValue
     }
 }
 
@@ -129,30 +134,56 @@ final class AppModel: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 guard status == .authorized else {
-                    self.lastError = "Speech permission is required to send a watch voice message."
+                    self.failWatchSpeech("Speech permission is required on iPhone")
+                    try? FileManager.default.removeItem(at: url)
                     return
                 }
-                guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: self.speechLanguage.localeIdentifier)),
-                      recognizer.isAvailable else {
-                    self.lastError = "Speech recognition is unavailable for the selected language."
+
+                let systemLocale = Locale.current.identifier
+                    .replacingOccurrences(of: "_", with: "-")
+                let locales = [
+                    Locale(identifier: self.speechLanguage.localeIdentifier),
+                    Locale(identifier: systemLocale),
+                    Locale(identifier: "en-US")
+                ]
+                guard let recognizer = locales
+                    .compactMap({ SFSpeechRecognizer(locale: $0) })
+                    .first(where: \.isAvailable) else {
+                    self.failWatchSpeech("Speech recognition unavailable")
+                    try? FileManager.default.removeItem(at: url)
                     return
                 }
+
                 self.watchSpeechTask?.cancel()
                 let request = SFSpeechURLRecognitionRequest(url: url)
+                request.shouldReportPartialResults = false
+                request.taskHint = .dictation
                 self.watchSpeechTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
                     guard let self else { return }
-                    if let result, result.isFinal {
-                        self.send(.voice_prompt, text: result.bestTranscription.formattedString)
+                    if let error {
+                        self.failWatchSpeech(error.localizedDescription)
                         try? FileManager.default.removeItem(at: url)
                         self.watchSpeechTask = nil
-                    } else if let error {
-                        self.lastError = error.localizedDescription
-                        try? FileManager.default.removeItem(at: url)
-                        self.watchSpeechTask = nil
+                        return
                     }
+                    guard let result, result.isFinal else { return }
+                    let text = result.bestTranscription.formattedString
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    try? FileManager.default.removeItem(at: url)
+                    self.watchSpeechTask = nil
+                    guard !text.isEmpty else {
+                        self.failWatchSpeech("Couldn't hear that — hold and speak again")
+                        return
+                    }
+                    self.send(.voice_prompt, text: text)
                 }
             }
         }
+    }
+
+    private func failWatchSpeech(_ message: String) {
+        lastError = message
+        phoneSession.notifyWatchSpeechError(message)
     }
 
     private func connect(_ payload: PairingPayload) {

@@ -1,8 +1,9 @@
 import SwiftUI
+import WatchKit
+import AVFoundation
 
 struct WatchStatusView: View {
     @EnvironmentObject private var model: WatchModel
-    @State private var showingVoice = false
 
     private var disconnected: Bool {
         !model.phoneReachable && model.snapshot.state == .idle
@@ -31,10 +32,10 @@ struct WatchStatusView: View {
             VStack(spacing: 0) {
                 statusHeader
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
 
                 Text(detail)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
                     .foregroundStyle(PulseTheme.mist)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
@@ -45,10 +46,10 @@ struct WatchStatusView: View {
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(PulseTheme.mistSoft)
                         .lineLimit(1)
-                        .padding(.top, 5)
+                        .padding(.top, 4)
                 }
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
                 if !disconnected {
                     controls
@@ -56,12 +57,6 @@ struct WatchStatusView: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-        }
-        .sheet(isPresented: $showingVoice) {
-            VoiceDictationView { text in
-                model.send(.voice_prompt, text: text)
-                showingVoice = false
-            }
         }
     }
 
@@ -94,27 +89,15 @@ struct WatchStatusView: View {
             HStack(spacing: 7) {
                 actionButton("Continue", icon: "arrow.right") { model.send(.continue) }
                     .tint(PulseTheme.accent)
-                speakButton
+                WatchHoldToTalkButton { url in
+                    model.sendVoiceRecording(url)
+                }
             }
         default:
-            speakButton
+            WatchHoldToTalkButton { url in
+                model.sendVoiceRecording(url)
+            }
         }
-    }
-
-    private var speakButton: some View {
-        Button {
-            showingVoice = true
-        } label: {
-            Label("Speak", systemImage: "mic.fill")
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(PulseTheme.accent)
-        .buttonBorderShape(.capsule)
-        .accessibilityLabel("Speak")
-        .accessibilityHint("Opens dictation to send a prompt")
     }
 
     private func actionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
@@ -126,5 +109,241 @@ struct WatchStatusView: View {
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.capsule)
+    }
+}
+
+// MARK: - Hold to talk (same interaction as iPhone)
+
+/// Hold → record, release → send audio to iPhone for transcription.
+/// watchOS has no Speech framework, so recognition happens on the phone.
+private struct WatchHoldToTalkButton: View {
+    var onSend: (URL) -> Void
+
+    @EnvironmentObject private var model: WatchModel
+    @StateObject private var recorder = WatchAudioCapture()
+    @State private var isPressed = false
+    @State private var isSending = false
+    @State private var errorMessage: String?
+    @State private var holdGeneration = 0
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(statusCopy)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(errorMessage == nil ? PulseTheme.mist : Color(red: 1, green: 0.45, blue: 0.4))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity)
+
+            ZStack {
+                Circle()
+                    .fill((isPressed ? Color.red : PulseTheme.accent).opacity(isPressed ? 0.35 : 0.16))
+                    .frame(width: isPressed ? 72 : 64, height: isPressed ? 72 : 64)
+                    .blur(radius: 6)
+
+                Circle()
+                    .fill(isPressed ? Color.red.opacity(0.9) : PulseTheme.accent)
+                    .frame(width: 52, height: 52)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                    )
+
+                Image(systemName: "mic.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .contentShape(Circle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !isPressed, !isSending else { return }
+                        beginHold()
+                    }
+                    .onEnded { _ in
+                        endHold()
+                    }
+            )
+            .accessibilityLabel("Hold to talk")
+            .accessibilityHint("Press and hold to speak, release to send")
+        }
+        .onAppear { recorder.prewarmPermission() }
+    }
+
+    private var statusCopy: String {
+        if let errorMessage, !errorMessage.isEmpty { return errorMessage }
+        if let modelError = model.speechError, !modelError.isEmpty { return modelError }
+        if isPressed { return "Listening — release to send" }
+        if isSending { return "Sending…" }
+        return "Hold to talk"
+    }
+
+    private func beginHold() {
+        errorMessage = nil
+        model.clearSpeechError()
+        model.stopSpeaking()
+        isPressed = true
+        holdGeneration += 1
+        let generation = holdGeneration
+        WKInterfaceDevice.current().play(.start)
+
+        recorder.startIfAllowed { result in
+            guard isPressed, generation == holdGeneration else {
+                _ = recorder.discard()
+                return
+            }
+            if case .failure(let error) = result {
+                isPressed = false
+                errorMessage = error.localizedDescription
+                WKInterfaceDevice.current().play(.failure)
+            }
+        }
+    }
+
+    private func endHold() {
+        guard isPressed else { return }
+        isPressed = false
+        holdGeneration += 1
+        WKInterfaceDevice.current().play(.click)
+
+        guard let url = recorder.stop() else {
+            errorMessage = "No speech detected. Hold, speak, then release."
+            WKInterfaceDevice.current().play(.failure)
+            return
+        }
+
+        isSending = true
+        onSend(url)
+        // Brief "Sending…" state so release feedback matches iPhone.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            isSending = false
+        }
+    }
+}
+
+@MainActor
+private final class WatchAudioCapture: ObservableObject {
+    private var recorder: AVAudioRecorder?
+    private var recordingURL: URL?
+    private var startedAt: Date?
+    private var permission: Permission = .unknown
+
+    private enum Permission {
+        case unknown, granted, denied
+    }
+
+    func prewarmPermission() {
+        let session = AVAudioSession.sharedInstance()
+        switch session.recordPermission {
+        case .granted:
+            permission = .granted
+        case .denied:
+            permission = .denied
+        case .undetermined:
+            session.requestRecordPermission { [weak self] granted in
+                Task { @MainActor in
+                    self?.permission = granted ? .granted : .denied
+                }
+            }
+        @unknown default:
+            break
+        }
+    }
+
+    func startIfAllowed(completion: @escaping (Result<Void, Error>) -> Void) {
+        let begin = { [weak self] in
+            guard let self else { return }
+            do {
+                try self.startRecording()
+                completion(.success(()))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+
+        switch permission {
+        case .granted:
+            begin()
+        case .denied:
+            completion(.failure(Self.error("Enable Microphone in Watch Settings")))
+        case .unknown:
+            AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
+                Task { @MainActor in
+                    self?.permission = granted ? .granted : .denied
+                    guard granted else {
+                        completion(.failure(Self.error("Microphone access is required")))
+                        return
+                    }
+                    begin()
+                }
+            }
+        }
+    }
+
+    private func startRecording() throws {
+        _ = discard()
+        let session = AVAudioSession.sharedInstance()
+        try? session.setActive(false, options: .notifyOthersOnDeactivation)
+        try session.setCategory(.record, mode: .measurement, options: [])
+        try session.setActive(true)
+
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("watch-prompt-\(UUID().uuidString)")
+            .appendingPathExtension("m4a")
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 16_000,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        let recorder = try AVAudioRecorder(url: url, settings: settings)
+        recorder.prepareToRecord()
+        guard recorder.record() else {
+            throw Self.error("Could not start recording")
+        }
+        self.recorder = recorder
+        recordingURL = url
+        startedAt = Date()
+    }
+
+    func stop() -> URL? {
+        guard let recorder else { return nil }
+        let elapsed = startedAt.map { Date().timeIntervalSince($0) } ?? 0
+        if recorder.isRecording { recorder.stop() }
+        self.recorder = nil
+        startedAt = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
+        defer { recordingURL = nil }
+        guard let url = recordingURL else { return nil }
+
+        // Match iPhone feel: short taps don't count as speech.
+        if elapsed < 0.35 {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
+        if size < 600 {
+            try? FileManager.default.removeItem(at: url)
+            return nil
+        }
+        return url
+    }
+
+    @discardableResult
+    func discard() -> URL? {
+        if let recorder, recorder.isRecording { recorder.stop() }
+        self.recorder = nil
+        startedAt = nil
+        if let url = recordingURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        recordingURL = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        return nil
+    }
+
+    private static func error(_ message: String) -> NSError {
+        NSError(domain: "VibeSignal", code: 3, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }

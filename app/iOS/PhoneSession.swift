@@ -38,6 +38,14 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         }
     }
 
+    func notifyWatchSpeechError(_ message: String) {
+        guard canPushToWatch, let session, session.isReachable else { return }
+        session.sendMessage(
+            [WCKeys.speechError: message],
+            replyHandler: nil
+        ) { _ in }
+    }
+
     private var canPushToWatch: Bool {
         guard let session,
               session.activationState == .activated,

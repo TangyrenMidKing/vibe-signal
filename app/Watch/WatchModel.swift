@@ -9,6 +9,7 @@ final class WatchModel: NSObject, ObservableObject {
     @Published var snapshot = StateSnapshot(state: .idle, detail: "Waiting for iPhone")
     @Published var phoneConnected = false
     @Published var phoneReachable = false
+    @Published var speechError: String?
 
     private var lastHapticState: AgentState?
     private var lastSpokenResponseTimestamp: Int64?
@@ -21,6 +22,10 @@ final class WatchModel: NSObject, ObservableObject {
         session.delegate = self
         session.activate()
         self.session = session
+    }
+
+    func clearSpeechError() {
+        speechError = nil
     }
 
     func send(_ command: AgentCommand, text: String? = nil) {
@@ -39,6 +44,19 @@ final class WatchModel: NSObject, ObservableObject {
                 WKInterfaceDevice.current().play(.failure)
             }
         }
+        WKInterfaceDevice.current().play(.success)
+    }
+
+    func sendVoiceRecording(_ url: URL) {
+        let linked = phoneReachable || phoneConnected
+        guard linked, let session else {
+            speechError = "iPhone not reachable"
+            WKInterfaceDevice.current().play(.failure)
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        speechError = nil
+        session.transferFile(url, metadata: [WCKeys.command: AgentCommand.voice_prompt.rawValue])
         WKInterfaceDevice.current().play(.success)
     }
 
@@ -78,6 +96,10 @@ final class WatchModel: NSObject, ObservableObject {
         }
         if let connected = dict[WCKeys.connected] as? Bool {
             phoneConnected = connected
+        }
+        if let error = dict[WCKeys.speechError] as? String, !error.isEmpty {
+            speechError = error
+            WKInterfaceDevice.current().play(.failure)
         }
     }
 
@@ -144,6 +166,20 @@ extension WatchModel: WCSessionDelegate {
 
     nonisolated func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
         Task { @MainActor in apply(message) }
+    }
+
+    nonisolated func session(
+        _ session: WCSession,
+        didFinish fileTransfer: WCSessionFileTransfer,
+        error: Error?
+    ) {
+        Task { @MainActor in
+            if let error {
+                speechError = error.localizedDescription
+                WKInterfaceDevice.current().play(.failure)
+            }
+        }
+        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
     }
 
     nonisolated func sessionReachabilityDidChange(_ session: WCSession) {

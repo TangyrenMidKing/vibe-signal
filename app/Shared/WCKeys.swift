@@ -13,6 +13,7 @@ public enum WCKeys {
     public static let connected = "connected"
     public static let command = "command"
     public static let text = "text"
+    public static let speechError = "speechError"
 }
 
 public extension StateSnapshot {
