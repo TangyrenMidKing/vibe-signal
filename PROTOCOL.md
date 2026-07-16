@@ -20,7 +20,7 @@ Single source of truth for WebSocket messages and the local hook HTTP contract b
 | `deny`         | Deny pending `PermissionRequest` (Cancel in MVP)     |
 | `continue`     | Send a default continue prompt via `Stop` hook       |
 | `retry`        | Same as continue with a "retry" reason               |
-| `voice_prompt` | Free-text prompt injected via `Stop`; if idle/completed/error, starts/resumes one Codex exec turn (never while `working`/`waiting`) |
+| `voice_prompt` | Free-text prompt injected via `Stop`; if idle/completed/error, starts/resumes one Codex exec turn in a **visible VS Code terminal** named “Vibe Signal” (never while `working`/`waiting`) |
 
 ---
 

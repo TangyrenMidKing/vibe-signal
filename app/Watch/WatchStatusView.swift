@@ -27,7 +27,12 @@ struct WatchStatusView: View {
 
     var body: some View {
         ZStack {
+            // Soft full-screen wash per state (muted so text stays readable).
             PulseTheme.ink.ignoresSafeArea()
+            signal
+                .opacity(0.20)
+                .ignoresSafeArea()
+                .animation(.easeInOut(duration: 0.35), value: state)
 
             VStack(spacing: 0) {
                 statusHeader
@@ -85,15 +90,9 @@ struct WatchStatusView: View {
                 actionButton("Decline", icon: "xmark") { model.send(.deny) }
                     .tint(PulseTheme.signal(.working))
             }
-        case .completed, .error:
-            HStack(spacing: 7) {
-                actionButton("Continue", icon: "arrow.right") { model.send(.continue) }
-                    .tint(PulseTheme.accent)
-                WatchHoldToTalkButton { url in
-                    model.sendVoiceRecording(url)
-                }
-            }
         default:
+            // completed / error / idle / working: hold-to-talk only.
+            // Voice prompt already continues a paused turn (Stop hook).
             WatchHoldToTalkButton { url in
                 model.sendVoiceRecording(url)
             }
