@@ -213,14 +213,15 @@ export async function activate(
       };
       const next = map[pick.label];
       if (!next) return;
+      const turnId = `sim-${Date.now()}`;
       controller.state.setState(next.state, next.detail, {
         sessionId: "sim",
-        turnId: `sim-${Date.now()}`,
+        turnId,
       });
       if (next.state === "waiting") {
-        controller.decisions.beginPermission(`sim-${Date.now()}`);
+        controller.decisions.beginPermission(turnId);
       } else if (next.state === "completed") {
-        controller.decisions.beginStop(`sim-${Date.now()}`);
+        controller.decisions.beginStop(turnId);
       }
     })
   );

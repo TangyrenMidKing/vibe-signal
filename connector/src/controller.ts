@@ -3,7 +3,11 @@ import * as vscode from "vscode";
 import { StateMachine } from "./state";
 import { DecisionHub } from "./decisionHub";
 import { ConnectorServer } from "./server";
-import { launchCodexTurn } from "./codexLauncher";
+import {
+  isCodexTurnActive,
+  launchCodexTurn,
+  releaseCodexTurnLock,
+} from "./codexLauncher";
 import { generateToken, preferredLanAddress } from "./network";
 import type { AgentState, PairingPayload, StateSnapshot } from "./types";
 
@@ -213,6 +217,7 @@ export class ConnectorController extends EventEmitter {
 
   async dispose(): Promise<void> {
     await this.stop();
+    releaseCodexTurnLock();
     this.state.dispose();
   }
 
@@ -240,6 +245,12 @@ export class ConnectorController extends EventEmitter {
       stopTimeoutMs,
       onClientCountChange: () => this.emit("change", this.getInfo()),
       onStartTurn: async (request) => {
+        // Hard cap: one phone-launched Codex process, even if state briefly
+        // looks idle before the first hook arrives.
+        if (isCodexTurnActive()) return false;
+        const current = this.state.get().state;
+        if (current === "working" || current === "waiting") return false;
+
         const cwd =
           request.cwd ??
           vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

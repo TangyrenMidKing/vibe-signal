@@ -189,9 +189,14 @@ final class AppModel: NSObject, ObservableObject {
         case .continue, .retry:
             return snapshot.state == .completed && ageMs < 295_000
         case .voice_prompt:
-            // The connector can inject into an active Stop hook or launch a
-            // fresh/resumed Codex turn when the agent is idle.
-            return isConnected
+            // One thread only: inject into a paused turn, or start when idle.
+            guard isConnected else { return false }
+            switch snapshot.state {
+            case .idle, .completed, .error:
+                return true
+            case .working, .waiting:
+                return false
+            }
         }
     }
 

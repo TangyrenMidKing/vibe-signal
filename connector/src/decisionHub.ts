@@ -99,7 +99,7 @@ export class DecisionHub {
   resolvePermission(decision: Exclude<PermissionDecision, { decision: "timeout" }>): boolean {
     const key = this.activePermissionKey;
     if (!key) return false;
-    if (key && this.permissionWaiters.has(key)) {
+    if (this.permissionWaiters.has(key)) {
       const w = this.permissionWaiters.get(key)!;
       clearTimeout(w.timer);
       this.permissionWaiters.delete(key);
@@ -107,6 +107,9 @@ export class DecisionHub {
       w.resolve(decision);
       return true;
     }
+    // Handoff: phone decided before the hook's long-poll arrived.
+    // Only one decision is accepted per turn.
+    if (this.pendingPermission) return false;
     this.pendingPermission = decision;
     return true;
   }
@@ -114,7 +117,7 @@ export class DecisionHub {
   resolveStop(decision: Exclude<StopDecision, { decision: "timeout" }>): boolean {
     const key = this.activeStopKey;
     if (!key) return false;
-    if (key && this.stopWaiters.has(key)) {
+    if (this.stopWaiters.has(key)) {
       const w = this.stopWaiters.get(key)!;
       clearTimeout(w.timer);
       this.stopWaiters.delete(key);
@@ -122,6 +125,9 @@ export class DecisionHub {
       w.resolve(decision);
       return true;
     }
+    // Handoff: phone decided before the hook's long-poll arrived.
+    // Only one decision is accepted per turn.
+    if (this.pendingStop) return false;
     this.pendingStop = decision;
     return true;
   }

@@ -124,8 +124,14 @@ export class StateMachine extends EventEmitter {
     const event = String(body.hook_event_name ?? body.type ?? "");
     const sessionId =
       typeof body.session_id === "string" ? body.session_id : undefined;
+    // Prefer turn_id; fall back to session_id so decision-hub keys and
+    // snapshot.turnId stay aligned when Codex omits turn_id.
     const turnId =
-      typeof body.turn_id === "string" ? body.turn_id : undefined;
+      typeof body.turn_id === "string"
+        ? body.turn_id
+        : typeof body.session_id === "string"
+          ? body.session_id
+          : undefined;
     const cwd = typeof body.cwd === "string" ? body.cwd : undefined;
     const loc = resolveProjectRepo(cwd);
     const meta: StateMeta = {

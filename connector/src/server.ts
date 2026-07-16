@@ -121,26 +121,37 @@ export class ConnectorServer {
 
   async handleCommand(cmd: CommandMessage): Promise<AckMessage> {
     switch (cmd.command) {
-      case "approve":
-        return this.decisionAck(
-          "approve",
-          this.decisions.resolvePermission({ decision: "allow" })
-        );
-      case "deny":
-        return this.decisionAck("deny", this.decisions.resolvePermission({
+      case "approve": {
+        const ok = this.decisions.resolvePermission({ decision: "allow" });
+        if (ok) this.resumeAfterDecision("Approved");
+        return this.decisionAck("approve", ok);
+      }
+      case "deny": {
+        const ok = this.decisions.resolvePermission({
           decision: "deny",
           message: cmd.text ?? "Denied from Vibe Signal",
-        }));
-      case "continue":
-        return this.decisionAck("continue", this.decisions.resolveStop({
+        });
+        if (ok) this.resumeAfterDecision("Denied");
+        return this.decisionAck("deny", ok);
+      }
+      case "continue": {
+        const reason = cmd.text?.trim() || "Continue.";
+        const ok = this.decisions.resolveStop({
           decision: "continue",
-          reason: cmd.text?.trim() || "Continue.",
-        }));
-      case "retry":
-        return this.decisionAck("retry", this.decisions.resolveStop({
+          reason,
+        });
+        if (ok) this.resumeAfterDecision(reason);
+        return this.decisionAck("continue", ok);
+      }
+      case "retry": {
+        const reason = cmd.text?.trim() || "Retry.";
+        const ok = this.decisions.resolveStop({
           decision: "continue",
-          reason: cmd.text?.trim() || "Retry.",
-        }));
+          reason,
+        });
+        if (ok) this.resumeAfterDecision(reason);
+        return this.decisionAck("retry", ok);
+      }
       case "voice_prompt": {
         const text = cmd.text?.trim();
         if (!text) {
@@ -151,11 +162,18 @@ export class ConnectorServer {
             message: "Missing text",
           };
         }
+        // Prefer injecting into the one paused turn (Stop hook long-polling).
         if (this.decisions.resolveStop({ decision: "continue", reason: text })) {
+          this.resumeAfterDecision(text);
           return { type: "ack", command: "voice_prompt", ok: true };
         }
-        if (this.onStartTurn) {
-          const current = this.state.get();
+        // One thread only: never spawn while Codex is mid-turn.
+        const current = this.state.get();
+        const canStartTurn =
+          current.state === "idle" ||
+          current.state === "completed" ||
+          current.state === "error";
+        if (this.onStartTurn && canStartTurn) {
           const started = await this.onStartTurn({
             prompt: text,
             sessionId: current.sessionId,
@@ -169,7 +187,9 @@ export class ConnectorServer {
           type: "ack",
           command: "voice_prompt",
           ok: false,
-          message: "Could not start a Codex turn on the desktop.",
+          message: canStartTurn
+            ? "Could not start a Codex turn on the desktop."
+            : "Codex is busy. Only one thread at a time.",
         };
       }
       default:
@@ -179,6 +199,17 @@ export class ConnectorServer {
           ok: false,
           message: "Unknown command",
         };
+    }
+  }
+
+  /**
+   * After a phone decision, leave waiting/completed immediately so the UI
+   * (and a follow-up voice_prompt) cannot treat the turn as still paused.
+   */
+  private resumeAfterDecision(detail: string): void {
+    const current = this.state.get();
+    if (current.state === "waiting" || current.state === "completed") {
+      this.state.setState("working", detail.slice(0, 80));
     }
   }
 
@@ -303,9 +334,13 @@ export class ConnectorServer {
     decision: string
   ): void {
     const current = this.state.get();
+    const sameTurn =
+      current.turnId === turnId ||
+      current.sessionId === turnId ||
+      (!current.turnId && turnId === "default");
     if (
       decision === "timeout" &&
-      current.turnId === turnId &&
+      sameTurn &&
       current.state === expectedState
     ) {
       this.state.setState("idle", "Waiting for agent");

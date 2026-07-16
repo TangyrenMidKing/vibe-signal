@@ -51,7 +51,14 @@ final class WatchModel: NSObject, ObservableObject {
         case .continue, .retry:
             return snapshot.state == .completed && ageMs < 295_000
         case .voice_prompt:
-            return phoneConnected
+            // One thread only: inject into a paused turn, or start when idle.
+            guard phoneConnected else { return false }
+            switch snapshot.state {
+            case .idle, .completed, .error:
+                return true
+            case .working, .waiting:
+                return false
+            }
         }
     }
 
