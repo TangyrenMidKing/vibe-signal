@@ -2,9 +2,18 @@
   "name": "vibe-signal",
   "displayName": "Vibe Signal",
   "description": "Keep your AI coding agent connected to your Apple Watch and iPhone.",
-  "version": "0.1.0",
-  "publisher": "vibesignal",
+  "version": "0.1.1",
+  "publisher": "ShiboDing",
+  "license": "MIT",
   "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TangyrenMidKing/vibe-signal.git"
+  },
+  "homepage": "https://github.com/TangyrenMidKing/vibe-signal#readme",
+  "bugs": {
+    "url": "https://github.com/TangyrenMidKing/vibe-signal/issues"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -114,7 +123,7 @@
     "compile": "tsc -p ./",
     "test": "npm run compile && node --test \"test/*.test.js\"",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package"
   },
   "dependencies": {
     "ws": "^8.18.0"

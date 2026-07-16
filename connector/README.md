@@ -37,9 +37,11 @@ If the status item is missing, right-click the status bar → enable **Vibe Sign
 ```bash
 cd connector
 npm run compile
-npx @vscode/vsce package --no-dependencies
-# then: Extensions → … → Install from VSIX… → agentpulse-0.1.0.vsix
+npx @vscode/vsce package
+# then: Extensions → … → Install from VSIX… → vibe-signal-0.1.1.vsix
 ```
+
+Do **not** use `--no-dependencies` — the extension needs the `ws` package at runtime.
 
 ## Develop
 
@@ -55,9 +57,11 @@ $env:AGENTPULSE_TOKEN='dev'; node scripts/dev-server.js
 node scripts/ws-client.js 127.0.0.1 8787 dev
 ```
 
-## Package
+## Package / Publish
 
 ```bash
+npm install
 npm run compile
-npx @vscode/vsce package --no-dependencies
+npx @vscode/vsce package
+npx @vscode/vsce publish
 ```

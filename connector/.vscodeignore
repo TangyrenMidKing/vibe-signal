@@ -1,11 +1,14 @@
 .vscode-test/
 .vscode/
 src/
-node_modules/
 scripts/
+test/
 **/*.ts
 !out/**/*.js
 *.map
 tsconfig.json
 .gitignore
 .DS_Store
+*.vsix
+_vsix_check/
+_check.zip
