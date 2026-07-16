@@ -18,7 +18,6 @@
 		5C2DBD1FDA3504FC0D9EDF28 /* WCKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C4FC122962ED21BBD1FBC18 /* WCKeys.swift */; };
 		5DFAF65750248F394496E9CE /* PhoneSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33C32AA218F3B4846A2895F /* PhoneSession.swift */; };
 		5E246761F9EEE66515AAAD6E /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B6C48471D9B932AA7CD68B /* QRScannerView.swift */; };
-		689CDD1501F1AE4A4F3B4BFD /* VoiceDictationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB72CCF1DB00F52CE5E193A6 /* VoiceDictationView.swift */; };
 		700C7A51DF24809C9CB441CD /* AgentPulseWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 182DFC70074207057F51977E /* AgentPulseWatchApp.swift */; };
 		7454A86C1E043690D38B4F0D /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60ADBD641AF94EFC77E2F597 /* Theme.swift */; };
 		87859B1D1C16652179EBC065 /* AgentPulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B1C8292E0F6426F4A23BBA7 /* AgentPulseApp.swift */; };
@@ -81,7 +80,6 @@
 		E9A96AF0E358F926BB72F430 /* WatchStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchStatusView.swift; sourceTree = "<group>"; };
 		EF6B8713B37100FF27A407BF /* AgentPulse.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AgentPulse.entitlements; sourceTree = "<group>"; };
 		F7D8A7D83EA6FF3C1830000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		FB72CCF1DB00F52CE5E193A6 /* VoiceDictationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceDictationView.swift; sourceTree = "<group>"; };
 		FB806B6FB909A7593674680C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -92,7 +90,6 @@
 				182DFC70074207057F51977E /* AgentPulseWatchApp.swift */,
 				A03773458D7A82409E5D2477 /* Assets.xcassets */,
 				E272A105CED22689BA485254 /* Info.plist */,
-				FB72CCF1DB00F52CE5E193A6 /* VoiceDictationView.swift */,
 				13BF9756CBB0AB715923A832 /* WatchModel.swift */,
 				E9A96AF0E358F926BB72F430 /* WatchStatusView.swift */,
 			);
@@ -204,7 +201,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2660;
 			};
 			buildConfigurationList = 9F9FCDCFBA783207F1510CB3 /* Build configuration list for PBXProject "VibeSignal" */;
 			developmentRegion = en;
@@ -256,7 +253,6 @@
 				E05E2F35EE575F9F307260D0 /* FeedbackLogView.swift in Sources */,
 				1FB422B76E9606C8B81B6421 /* Models.swift in Sources */,
 				7454A86C1E043690D38B4F0D /* Theme.swift in Sources */,
-				689CDD1501F1AE4A4F3B4BFD /* VoiceDictationView.swift in Sources */,
 				5C2DBD1FDA3504FC0D9EDF28 /* WCKeys.swift in Sources */,
 				E3CDF99B636CFCC339F1040E /* WatchModel.swift in Sources */,
 				C50D5C329096C405D1ADA0CA /* WatchStatusView.swift in Sources */,
@@ -297,7 +293,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = Watch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vibesignal.app.watchkitapp;
@@ -312,6 +307,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -342,10 +338,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -358,6 +356,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.9;
@@ -370,6 +369,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
@@ -400,10 +400,12 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -423,6 +425,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.9;
@@ -437,7 +440,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iOS/AgentPulse.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -455,7 +457,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = Watch/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				PRODUCT_BUNDLE_IDENTIFIER = com.vibesignal.app.watchkitapp;
@@ -472,7 +473,6 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iOS/AgentPulse.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = K5XUC5W69Z;
 				INFOPLIST_FILE = iOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Vibe Signal";
 				LD_RUNPATH_SEARCH_PATHS = (
