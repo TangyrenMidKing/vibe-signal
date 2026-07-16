@@ -6,7 +6,6 @@ out/
 *.xcworkspace/xcuserdata
 DerivedData/
 .build/
-AgentPulse.xcodeproj/
-app/AgentPulse.xcodeproj/
 .env
 *.log
+*.xcodeproj/
