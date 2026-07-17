@@ -358,6 +358,7 @@ final class AppModel: NSObject, ObservableObject {
     private var watchSpeechTask: SFSpeechRecognitionTask?
     private var lastTTSTimestamp: Int64?
     private var ttsTask: Task<Void, Never>?
+    private let backgroundBridge = BackgroundBridge()
 
     private lazy var phoneSession: PhoneSession = PhoneSession(appModel: self)
 
@@ -368,6 +369,7 @@ final class AppModel: NSObject, ObservableObject {
         openAIVoice = OpenAITTS.voice
         requestNotificationPermission()
         phoneSession.activate()
+        refreshBackgroundBridge()
 
         client.$snapshot
             .receive(on: RunLoop.main)
@@ -404,6 +406,7 @@ final class AppModel: NSObject, ObservableObject {
                         connected: connected,
                         ttsPending: ttsInFlight
                     )
+                    self.refreshBackgroundBridge()
                 }
             }
             .store(in: &cancellables)
@@ -417,6 +420,33 @@ final class AppModel: NSObject, ObservableObject {
         }
     }
 
+    /// App became active — heal any socket that died while suspended.
+    func handleBecameActive() {
+        backgroundBridge.endBackgroundTask()
+        refreshBackgroundBridge()
+        client.ensureConnected()
+    }
+
+    /// Leaving the foreground — extend runtime and keep the audio bridge warm.
+    func handleEnteringBackground() {
+        backgroundBridge.beginBackgroundExecution()
+        refreshBackgroundBridge()
+        client.ensureConnected()
+    }
+
+    func suspendBackgroundAudioForCapture() {
+        backgroundBridge.suspendForCapture()
+    }
+
+    func resumeBackgroundAudioAfterCapture() {
+        backgroundBridge.resumeAfterCapture()
+    }
+
+    private func refreshBackgroundBridge() {
+        // Stay runnable whenever we have a pairing — reconnect may take a moment.
+        backgroundBridge.setEnabled(pairing != nil)
+    }
+
     func applyPairing(_ payload: PairingPayload) {
         pairing = payload
         needsPairing = false
@@ -424,6 +454,7 @@ final class AppModel: NSObject, ObservableObject {
             defaults.set(data, forKey: pairingKey)
         }
         connect(payload)
+        refreshBackgroundBridge()
     }
 
     func clearPairing() {
@@ -432,6 +463,7 @@ final class AppModel: NSObject, ObservableObject {
         needsPairing = true
         defaults.removeObject(forKey: pairingKey)
         snapshot = StateSnapshot(state: .idle, detail: "Not connected")
+        refreshBackgroundBridge()
     }
 
     func send(_ command: AgentCommand, text: String? = nil) {

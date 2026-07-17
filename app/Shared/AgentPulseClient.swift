@@ -41,6 +41,28 @@ public final class VibeSignalClient: ObservableObject {
         isConnected = false
     }
 
+    /// Call when returning to the foreground — suspended Tasks may have
+    /// missed reconnect windows while the process was frozen.
+    public func ensureConnected() {
+        guard shouldRun, pairing != nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        reconnectAttempt = 0
+        if let task, task.state == .running, isConnected {
+            // Probe the socket; a dead half-open connection reports failure.
+            task.sendPing { [weak self] error in
+                Task { @MainActor in
+                    guard let self else { return }
+                    if error != nil {
+                        self.openSocket()
+                    }
+                }
+            }
+            return
+        }
+        openSocket()
+    }
+
     public func send(command: AgentCommand, text: String? = nil) {
         let msg = CommandMessage(command: command, text: text, id: UUID().uuidString)
         guard let data = try? JSONEncoder().encode(msg),
@@ -72,6 +94,8 @@ public final class VibeSignalClient: ObservableObject {
             let config = URLSessionConfiguration.default
             config.waitsForConnectivity = true
             config.timeoutIntervalForRequest = 30
+            // Allow the socket to idle longer once we hold an audio background mode.
+            config.shouldUseExtendedBackgroundIdleMode = true
             session = URLSession(configuration: config)
         }
 

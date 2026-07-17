@@ -34,9 +34,11 @@
 	<string>Connect to the Vibe Signal connector on your computer over Wi‑Fi.</string>
 	<key>NSBonjourServices</key>
 	<array/>
+	<!-- Keep the LAN WebSocket bridge (and phone TTS → Watch transfers) alive
+	     while the screen is locked. Paired with BackgroundBridge silent audio. -->
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>fetch</string>
+		<string>audio</string>
 	</array>
 </dict>
 </plist>

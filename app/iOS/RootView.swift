@@ -379,6 +379,7 @@ struct HoldToTalkButton: View {
     let language: SpeechLanguage
     var onSend: (String) -> Void
 
+    @EnvironmentObject private var model: AppModel
     @State private var isPressed = false
     @State private var transcript = ""
     @State private var errorMessage: String?
@@ -493,6 +494,7 @@ struct HoldToTalkButton: View {
         isFinalizing = false
         pulse = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        model.suspendBackgroundAudioForCapture()
         speech.start(localeIdentifier: language.localeIdentifier) { result in
             switch result {
             case .success(let spoken):
@@ -503,6 +505,7 @@ struct HoldToTalkButton: View {
                 isPressed = false
                 pulse = false
                 isFinalizing = false
+                model.resumeBackgroundAudioAfterCapture()
             }
         }
     }
@@ -510,6 +513,7 @@ struct HoldToTalkButton: View {
     private func endHold() {
         guard isPressed else { return }
         speech.stop()
+        model.resumeBackgroundAudioAfterCapture()
         isPressed = false
         pulse = false
         isFinalizing = true
