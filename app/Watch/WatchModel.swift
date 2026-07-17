@@ -21,6 +21,8 @@ final class WatchModel: NSObject, ObservableObject {
     private var replyPlayer: AVAudioPlayer?
     /// Keep decoded audio alive for background AVAudioPlayer(data:).
     private var replyAudioData: Data?
+    /// File-backed playback (mp3) — AVAudioPlayer needs a real file extension.
+    private var replyAudioURL: URL?
 
     func start() {
         guard WCSession.isSupported() else { return }
@@ -125,6 +127,10 @@ final class WatchModel: NSObject, ObservableObject {
         synthesizer.stopSpeaking(at: .immediate)
         replyPlayer?.stop()
         replyPlayer = nil
+        if let old = replyAudioURL {
+            try? FileManager.default.removeItem(at: old)
+            replyAudioURL = nil
+        }
 
         guard !data.isEmpty else {
             speechError = "Couldn't play reply audio"
@@ -134,14 +140,35 @@ final class WatchModel: NSObject, ObservableObject {
         }
         replyAudioData = data
 
+        // Write with .mp3 so the decoder can sniff the container. Playing raw
+        // OpenAI AAC-as-m4a produced mDataByteSize(0) / silence on watchOS.
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reply-\(ts)-\(UUID().uuidString)")
+            .appendingPathExtension("mp3")
+        do {
+            try data.write(to: url, options: .atomic)
+        } catch {
+            speechError = "Couldn't save reply audio"
+            pendingLocalSpeakTs = ts
+            speakLocal(snapshot.detail, ts: ts)
+            return
+        }
+        replyAudioURL = url
+
         activatePlaybackSession { [weak self] in
             guard let self else { return }
             do {
-                // data: initializer is more reliable for wrist-down / screen-off playback.
-                let player = try AVAudioPlayer(data: data)
+                let player = try AVAudioPlayer(contentsOf: url)
                 player.delegate = self
                 player.prepareToPlay()
                 player.volume = 1
+                // duration ~0 means the buffer never decoded (bad format).
+                guard player.duration > 0.05 else {
+                    self.speechError = "Reply audio unreadable"
+                    self.pendingLocalSpeakTs = ts
+                    self.speakLocal(self.snapshot.detail, ts: ts)
+                    return
+                }
                 self.replyPlayer = player
                 guard player.play() else {
                     self.pendingLocalSpeakTs = ts
@@ -169,6 +196,10 @@ final class WatchModel: NSObject, ObservableObject {
         replyPlayer?.stop()
         replyPlayer = nil
         replyAudioData = nil
+        if let url = replyAudioURL {
+            try? FileManager.default.removeItem(at: url)
+            replyAudioURL = nil
+        }
         pendingLocalSpeakTs = nil
         isReadingReply = false
     }
@@ -230,11 +261,11 @@ final class WatchModel: NSObject, ObservableObject {
         } catch {
             try? audio.setCategory(.playback, mode: .default, options: [])
         }
-        audio.activate(options: []) { _, error in
-            Task { @MainActor in
-                if error != nil {
-                    try? AVAudioSession.sharedInstance().setActive(true)
-                }
+        // activate's completion runs off the main actor. Hop with
+        // DispatchQueue.main — Task { @MainActor } + setActive here was
+        // triggering unsafeForcedSync / IPCAUClient (-66748).
+        audio.activate(options: []) { _, _ in
+            DispatchQueue.main.async {
                 work()
             }
         }
@@ -267,6 +298,10 @@ extension WatchModel: AVAudioPlayerDelegate {
             if replyPlayer === player {
                 replyPlayer = nil
                 replyAudioData = nil
+                if let url = replyAudioURL {
+                    try? FileManager.default.removeItem(at: url)
+                    replyAudioURL = nil
+                }
                 isReadingReply = false
             }
         }

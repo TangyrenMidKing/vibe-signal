@@ -83,7 +83,7 @@ enum OpenAITTSError: LocalizedError {
     }
 }
 
-/// OpenAI Audio Speech API → AAC (m4a) for Watch playback.
+/// OpenAI Audio Speech API → mp3 for Watch playback.
 /// Lives in AppModel.swift so older Xcode projects that list files
 /// explicitly still compile without re-running xcodegen.
 enum OpenAITTS {
@@ -135,8 +135,9 @@ enum OpenAITTS {
             "model": "tts-1-hd",
             "input": input,
             "voice": voice.rawValue,
-            // AAC plays more reliably on watchOS than mp3.
-            "response_format": "aac"
+            // mp3: reliable with AVAudioPlayer. OpenAI "aac" is raw ADTS (not m4a)
+            // and produces empty buffers / silence on watchOS.
+            "response_format": "mp3"
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -150,7 +151,7 @@ enum OpenAITTS {
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("vibe-tts-\(UUID().uuidString)")
-            .appendingPathExtension("m4a")
+            .appendingPathExtension("mp3")
         try data.write(to: url, options: .atomic)
         return url
     }
