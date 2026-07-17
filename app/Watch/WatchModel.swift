@@ -92,7 +92,8 @@ final class WatchModel: NSObject, ObservableObject {
     }
 
     func apply(_ dict: [String: Any]) {
-        let ttsPending = dict[WCKeys.ttsPending] as? Bool ?? false
+        // WC often boxes Bool as NSNumber — `as? Bool` alone falsely reads false.
+        let ttsPending = WCKeys.bool(from: dict, key: WCKeys.ttsPending) ?? false
         if let snap = StateSnapshot.fromWC(dict) {
             let prev = snapshot.state
             snapshot = snap
@@ -104,7 +105,7 @@ final class WatchModel: NSObject, ObservableObject {
                 scheduleReplySpeech(detail: snap.detail, ts: snap.ts, preferOpenAI: ttsPending)
             }
         }
-        if let connected = dict[WCKeys.connected] as? Bool {
+        if let connected = WCKeys.bool(from: dict, key: WCKeys.connected) {
             phoneConnected = connected
         }
         if let error = dict[WCKeys.speechError] as? String, !error.isEmpty {
@@ -117,16 +118,17 @@ final class WatchModel: NSObject, ObservableObject {
         }
     }
 
-    func playReplyAudio(at url: URL, ts: Int64) {
+    func playReplyAudio(data: Data, ts: Int64) {
         // Cancel local fallback for this reply.
-        if pendingLocalSpeakTs == ts {
-            pendingLocalSpeakTs = nil
-        }
+        pendingLocalSpeakTs = nil
         lastSpokenResponseTimestamp = ts
-        stopSpeaking()
+        synthesizer.stopSpeaking(at: .immediate)
+        replyPlayer?.stop()
+        replyPlayer = nil
 
-        guard let data = try? Data(contentsOf: url), !data.isEmpty else {
+        guard !data.isEmpty else {
             speechError = "Couldn't play reply audio"
+            pendingLocalSpeakTs = ts
             speakLocal(snapshot.detail, ts: ts)
             return
         }
@@ -142,20 +144,23 @@ final class WatchModel: NSObject, ObservableObject {
                 player.volume = 1
                 self.replyPlayer = player
                 guard player.play() else {
+                    self.pendingLocalSpeakTs = ts
                     self.speakLocal(self.snapshot.detail, ts: ts)
                     return
                 }
                 self.isReadingReply = true
-                WKInterfaceDevice.current().play(.success)
                 self.speechError = nil
+                WKInterfaceDevice.current().play(.success)
             } catch {
                 self.speechError = "Couldn't play reply audio"
+                self.pendingLocalSpeakTs = ts
                 self.speakLocal(self.snapshot.detail, ts: ts)
             }
         }
     }
 
     func replayResponse() {
+        pendingLocalSpeakTs = snapshot.ts
         speakLocal(snapshot.detail, ts: snapshot.ts)
     }
 
@@ -171,18 +176,26 @@ final class WatchModel: NSObject, ObservableObject {
     private func scheduleReplySpeech(detail: String, ts: Int64, preferOpenAI: Bool) {
         lastSpokenResponseTimestamp = ts
         pendingLocalSpeakTs = ts
-        let delay: TimeInterval = preferOpenAI ? 8.0 : 0.35
+        // OpenAI synthesis + WatchConnectivity transfer often needs >8s.
+        let delay: TimeInterval = preferOpenAI ? 25.0 : 0.35
+        if preferOpenAI {
+            speechError = "Loading voice…"
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             // Still waiting for OpenAI audio / not spoken yet.
             guard self.pendingLocalSpeakTs == ts else { return }
+            self.speechError = preferOpenAI ? "Using Watch voice" : nil
             self.speakLocal(detail, ts: ts)
         }
     }
 
     private func speakLocal(_ response: String, ts: Int64) {
-        guard pendingLocalSpeakTs == ts || lastSpokenResponseTimestamp == ts else { return }
+        // Only speak when explicitly scheduled (fallback / replay). Do not
+        // re-trigger after OpenAI audio already played for the same ts.
+        guard pendingLocalSpeakTs == ts else { return }
         pendingLocalSpeakTs = nil
+        lastSpokenResponseTimestamp = ts
 
         var text = response.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
@@ -307,16 +320,19 @@ extension WatchModel: WCSessionDelegate {
         guard command == WCKeys.speakReply else { return }
         let ts = (file.metadata?[WCKeys.ts] as? NSNumber)?.int64Value
             ?? Int64(Date().timeIntervalSince1970 * 1_000)
-        let destination = FileManager.default.temporaryDirectory
-            .appendingPathComponent("reply-\(ts)-\(UUID().uuidString)")
-            .appendingPathExtension(file.fileURL.pathExtension.isEmpty ? "mp3" : file.fileURL.pathExtension)
+
+        // CRITICAL: read/move before this method returns — WC deletes the inbox
+        // file immediately afterward.
+        let audioData: Data
         do {
-            try FileManager.default.copyItem(at: file.fileURL, to: destination)
+            audioData = try Data(contentsOf: file.fileURL)
         } catch {
             return
         }
+        guard !audioData.isEmpty else { return }
+
         Task { @MainActor in
-            playReplyAudio(at: destination, ts: ts)
+            playReplyAudio(data: audioData, ts: ts)
         }
     }
 

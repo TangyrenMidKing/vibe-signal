@@ -5,6 +5,8 @@ import WatchConnectivity
 final class PhoneSession: NSObject, WCSessionDelegate {
     private weak var appModel: AppModel?
     private var session: WCSession?
+    /// Must retain transfers or WatchConnectivity can cancel them.
+    private var outstandingTransfers: [WCSessionFileTransfer] = []
 
     init(appModel: AppModel) {
         self.appModel = appModel
@@ -24,9 +26,10 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         guard let session else { return }
 
         var payload = state.wcPayload
-        payload[WCKeys.connected] = connected
+        // Use NSNumber so WatchConnectivity delivers a reliable bool on Watch.
+        payload[WCKeys.connected] = NSNumber(value: connected)
         if ttsPending {
-            payload[WCKeys.ttsPending] = true
+            payload[WCKeys.ttsPending] = NSNumber(value: true)
         }
         // WatchConnectivity drops oversized contexts; keep a speakable reply slice.
         if let detail = payload[WCKeys.detail] as? String, detail.count > 900 {
@@ -49,15 +52,17 @@ final class PhoneSession: NSObject, WCSessionDelegate {
     func transferSpeakReply(fileURL: URL, stateTs: Int64) {
         guard canPushToWatch, let session else {
             try? FileManager.default.removeItem(at: fileURL)
+            appModel?.lastError = "Watch not available for TTS transfer"
             return
         }
-        session.transferFile(
+        let transfer = session.transferFile(
             fileURL,
             metadata: [
                 WCKeys.command: WCKeys.speakReply,
-                WCKeys.ts: stateTs
+                WCKeys.ts: NSNumber(value: stateTs)
             ]
         )
+        outstandingTransfers.append(transfer)
     }
 
     func notifyWatchSpeechError(_ message: String) {
@@ -122,6 +127,20 @@ final class PhoneSession: NSObject, WCSessionDelegate {
         didFinish fileTransfer: WCSessionFileTransfer,
         error: Error?
     ) {
-        try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
+        Task { @MainActor in
+            outstandingTransfers.removeAll { $0 === fileTransfer }
+            if let error {
+                appModel?.lastError = "Watch TTS transfer failed: \(error.localizedDescription)"
+                notifyWatchSpeechError("TTS transfer failed — using Watch voice")
+                if let snap = appModel?.snapshot {
+                    push(
+                        state: snap,
+                        connected: appModel?.isConnected ?? false,
+                        ttsPending: false
+                    )
+                }
+            }
+            try? FileManager.default.removeItem(at: fileTransfer.file.fileURL)
+        }
     }
 }

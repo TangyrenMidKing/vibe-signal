@@ -83,7 +83,7 @@ enum OpenAITTSError: LocalizedError {
     }
 }
 
-/// OpenAI Audio Speech API → mp3 for Watch playback.
+/// OpenAI Audio Speech API → AAC (m4a) for Watch playback.
 /// Lives in AppModel.swift so older Xcode projects that list files
 /// explicitly still compile without re-running xcodegen.
 enum OpenAITTS {
@@ -135,7 +135,8 @@ enum OpenAITTS {
             "model": "tts-1-hd",
             "input": input,
             "voice": voice.rawValue,
-            "response_format": "mp3"
+            // AAC plays more reliably on watchOS than mp3.
+            "response_format": "aac"
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -149,7 +150,7 @@ enum OpenAITTS {
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("vibe-tts-\(UUID().uuidString)")
-            .appendingPathExtension("mp3")
+            .appendingPathExtension("m4a")
         try data.write(to: url, options: .atomic)
         return url
     }
@@ -248,7 +249,15 @@ final class AppModel: NSObject, ObservableObject {
             .sink { [weak self] connected in
                 self?.isConnected = connected
                 if let self {
-                    self.phoneSession.push(state: self.snapshot, connected: connected)
+                    let ttsInFlight =
+                        self.snapshot.state == .completed
+                        && OpenAITTS.hasAPIKey
+                        && self.lastTTSTimestamp == self.snapshot.ts
+                    self.phoneSession.push(
+                        state: self.snapshot,
+                        connected: connected,
+                        ttsPending: ttsInFlight
+                    )
                 }
             }
             .store(in: &cancellables)
@@ -390,7 +399,7 @@ final class AppModel: NSObject, ObservableObject {
         openAIVoice = voice
     }
 
-    /// Generate OpenAI TTS on the phone and ship mp3 to the Watch for playback.
+    /// Generate OpenAI TTS on the phone and ship audio to the Watch for playback.
     private func speakReplyToWatchIfNeeded(_ snap: StateSnapshot) {
         guard snap.state == .completed else { return }
         guard OpenAITTS.hasAPIKey else { return }
@@ -398,8 +407,10 @@ final class AppModel: NSObject, ObservableObject {
         lastTTSTimestamp = snap.ts
 
         let text = snap.detail.trimmingCharacters(in: .whitespacesAndNewlines)
-        let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent"]
+        let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent", "Stopped from Watch"]
         guard !text.isEmpty, !skip.contains(text) else { return }
+        // Ignore our own stop acknowledgements.
+        if text.hasPrefix("Stopped") { return }
 
         ttsTask?.cancel()
         let ts = snap.ts
@@ -416,12 +427,10 @@ final class AppModel: NSObject, ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    // Watch will fall back to on-device speech after ttsPending timeout.
                     self.lastError = error.localizedDescription
                     self.phoneSession.notifyWatchSpeechError(
                         "TTS failed — using Watch voice"
                     )
-                    // Re-push without ttsPending so Watch can speak locally.
                     self.phoneSession.push(
                         state: self.snapshot,
                         connected: self.isConnected,

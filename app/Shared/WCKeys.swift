@@ -14,10 +14,17 @@ public enum WCKeys {
     public static let command = "command"
     public static let text = "text"
     public static let speechError = "speechError"
-    /// File transfer: OpenAI TTS mp3 for Watch playback.
+    /// File transfer: OpenAI TTS audio for Watch playback.
     public static let speakReply = "speak_reply"
     /// State push hint: phone is generating OpenAI TTS; Watch should delay local speech.
     public static let ttsPending = "ttsPending"
+
+    /// WatchConnectivity often delivers Bool as NSNumber.
+    public static func bool(from dict: [String: Any], key: String) -> Bool? {
+        if let b = dict[key] as? Bool { return b }
+        if let n = dict[key] as? NSNumber { return n.boolValue }
+        return nil
+    }
 }
 
 public extension StateSnapshot {
