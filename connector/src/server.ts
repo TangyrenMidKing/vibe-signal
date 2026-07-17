@@ -20,6 +20,8 @@ export interface ConnectorServerOptions {
   stopTimeoutMs: number;
   onClientCountChange?: (count: number) => void;
   onStartTurn?: (request: StartTurnRequest) => Promise<boolean>;
+  /** Kill the phone-launched Codex terminal / process. */
+  onStopTurn?: () => boolean | Promise<boolean>;
 }
 
 export interface StartTurnRequest {
@@ -41,6 +43,7 @@ export class ConnectorServer {
   private readonly stopTimeoutMs: number;
   private readonly onClientCountChange?: (count: number) => void;
   private readonly onStartTurn?: (request: StartTurnRequest) => Promise<boolean>;
+  private readonly onStopTurn?: () => boolean | Promise<boolean>;
 
   constructor(opts: ConnectorServerOptions) {
     this.port = opts.port;
@@ -51,6 +54,7 @@ export class ConnectorServer {
     this.stopTimeoutMs = opts.stopTimeoutMs;
     this.onClientCountChange = opts.onClientCountChange;
     this.onStartTurn = opts.onStartTurn;
+    this.onStopTurn = opts.onStopTurn;
 
     this.httpServer = http.createServer((req, res) => {
       void this.handleHttp(req, res);
@@ -191,6 +195,28 @@ export class ConnectorServer {
             ? "Could not start a Codex turn on the desktop."
             : "Codex is busy. Only one thread at a time.",
         };
+      }
+      case "stop": {
+        const current = this.state.get().state;
+        if (current !== "working" && current !== "waiting") {
+          return {
+            type: "ack",
+            command: "stop",
+            ok: false,
+            message: "Nothing to stop.",
+          };
+        }
+        // Drop any pending permission/stop waiters so hooks don't hang.
+        this.decisions.clear();
+        const killed = this.onStopTurn ? await this.onStopTurn() : false;
+        // Always leave the active UI state so Watch/iPhone aren't stuck.
+        if (killed) {
+          this.state.setState("completed", "Stopped from Watch");
+        } else {
+          // Desktop-started turn we don't own — still mark stopped for clients.
+          this.state.setState("completed", "Stopped (desktop turn may still be running)");
+        }
+        return { type: "ack", command: "stop", ok: true };
       }
       default:
         return {

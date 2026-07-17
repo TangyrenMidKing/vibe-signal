@@ -77,6 +77,8 @@ final class WatchModel: NSObject, ObservableObject {
             return linked && snapshot.state == .waiting && ageMs < 115_000
         case .continue, .retry:
             return linked && snapshot.state == .completed && ageMs < 295_000
+        case .stop:
+            return linked && (snapshot.state == .working || snapshot.state == .waiting)
         case .voice_prompt:
             // One thread only: inject into a paused turn, or start when idle.
             guard linked else { return false }

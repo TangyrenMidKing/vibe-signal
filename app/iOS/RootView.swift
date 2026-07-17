@@ -184,6 +184,10 @@ struct RootView: View {
                     model.send(.deny)
                 }
             }
+        case .working:
+            PulseActionButton(title: "Stop", tint: PulseTheme.signal(.working)) {
+                model.send(.stop)
+            }
         case .completed, .error:
             HStack(spacing: 12) {
                 PulseActionButton(title: "Continue", tint: PulseTheme.accent) {

@@ -7,6 +7,7 @@ import {
   isCodexTurnActive,
   launchCodexTurn,
   releaseCodexTurnLock,
+  stopCodexTurn,
 } from "./codexLauncher";
 import { generateToken, preferredLanAddress } from "./network";
 import type { AgentState, PairingPayload, StateSnapshot } from "./types";
@@ -266,6 +267,7 @@ export class ConnectorController extends EventEmitter {
         }
         return started;
       },
+      onStopTurn: () => stopCodexTurn(),
     });
 
     try {

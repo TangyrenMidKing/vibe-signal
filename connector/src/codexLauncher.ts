@@ -91,6 +91,28 @@ export function isCodexTurnActive(): boolean {
   return starting;
 }
 
+/**
+ * Interrupt the phone-launched Codex terminal (Ctrl+C, then dispose).
+ * Returns true if we owned a live terminal to kill.
+ */
+export function stopCodexTurn(): boolean {
+  starting = false;
+  if (!activeTerminal) return false;
+  try {
+    // Soft interrupt first so Codex can wind down if it handles SIGINT.
+    activeTerminal.sendText("\u0003", false);
+  } catch {
+    // ignore
+  }
+  try {
+    activeTerminal.dispose();
+  } catch {
+    // ignore
+  }
+  activeTerminal = undefined;
+  return true;
+}
+
 /** Drop launcher bookkeeping (e.g. extension deactivate). */
 export function releaseCodexTurnLock(): void {
   starting = false;

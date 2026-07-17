@@ -91,26 +91,54 @@ struct WatchStatusView: View {
                     .tint(PulseTheme.signal(.working))
             }
         default:
-            // While a reply is playing, offer Stop; otherwise hold-to-talk.
-            if model.isReadingReply {
-                Button {
-                    model.stopSpeaking()
-                    WKInterfaceDevice.current().play(.click)
-                } label: {
-                    Label("Stop", systemImage: "stop.fill")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.red.opacity(0.9))
-                .buttonBorderShape(.capsule)
-                .accessibilityLabel("Stop reading")
+            // Stop while reading a reply, or while Codex is working.
+            if model.isReadingReply || model.snapshot.state == .working {
+                stopButton
             } else {
                 WatchHoldToTalkButton { url in
                     model.sendVoiceRecording(url)
                 }
             }
+        }
+    }
+
+    private var stopButton: some View {
+        VStack(spacing: 6) {
+            Text(model.isReadingReply ? "Tap to stop" : "Stop agent")
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .foregroundStyle(PulseTheme.mist)
+                .frame(maxWidth: .infinity)
+
+            Button {
+                if model.isReadingReply {
+                    model.stopSpeaking()
+                }
+                if model.snapshot.state == .working || model.snapshot.state == .waiting {
+                    model.send(.stop)
+                }
+                WKInterfaceDevice.current().play(.click)
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.35))
+                        .frame(width: 64, height: 64)
+                        .blur(radius: 6)
+
+                    Circle()
+                        .fill(Color.red.opacity(0.9))
+                        .frame(width: 52, height: 52)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
+                        )
+
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.isReadingReply ? "Stop reading" : "Stop Codex")
         }
     }
 

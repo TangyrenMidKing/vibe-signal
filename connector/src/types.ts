@@ -5,7 +5,8 @@ export type AgentCommand =
   | "deny"
   | "continue"
   | "retry"
-  | "voice_prompt";
+  | "voice_prompt"
+  | "stop";
 
 export interface StateSnapshot {
   type: "state";

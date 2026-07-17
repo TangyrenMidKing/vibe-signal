@@ -254,3 +254,26 @@ test("session_id-only Stop aligns turnId for timeout reset", () => {
   assert.equal(state.get().turnId, "sess-abc");
   assert.equal(state.get().sessionId, "sess-abc");
 });
+
+test("stop aborts a working turn and moves to completed", async () => {
+  let stopped = 0;
+  const { server, state } = makeServer({
+    onStopTurn: () => {
+      stopped += 1;
+      return true;
+    },
+  });
+  state.setState("working", "coding");
+
+  const ack = await server.handleCommand({ type: "command", command: "stop" });
+  assert.equal(ack.ok, true);
+  assert.equal(stopped, 1);
+  assert.equal(state.get().state, "completed");
+  assert.match(state.get().detail, /Stopped/i);
+});
+
+test("stop is rejected when idle", async () => {
+  const { server } = makeServer({ onStopTurn: () => true });
+  const ack = await server.handleCommand({ type: "command", command: "stop" });
+  assert.equal(ack.ok, false);
+});

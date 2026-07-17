@@ -25,6 +25,7 @@ public enum AgentCommand: String, Codable, Sendable {
     case `continue`
     case retry
     case voice_prompt
+    case stop
 }
 
 public struct StateSnapshot: Codable, Equatable, Sendable {

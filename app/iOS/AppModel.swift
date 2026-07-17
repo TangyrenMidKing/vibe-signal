@@ -439,6 +439,8 @@ final class AppModel: NSObject, ObservableObject {
             return snapshot.state == .waiting && ageMs < 115_000
         case .continue, .retry:
             return snapshot.state == .completed && ageMs < 295_000
+        case .stop:
+            return isConnected && (snapshot.state == .working || snapshot.state == .waiting)
         case .voice_prompt:
             // One thread only: inject into a paused turn, or start when idle.
             guard isConnected else { return false }
