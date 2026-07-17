@@ -120,7 +120,7 @@ final class WatchModel: NSObject, ObservableObject {
         }
     }
 
-    func playReplyAudio(data: Data, ts: Int64) {
+    func playReplyAudio(data: Data, ts: Int64, fileExtension: String = "mp3") {
         // Cancel local fallback for this reply.
         pendingLocalSpeakTs = nil
         lastSpokenResponseTimestamp = ts
@@ -140,11 +140,10 @@ final class WatchModel: NSObject, ObservableObject {
         }
         replyAudioData = data
 
-        // Write with .mp3 so the decoder can sniff the container. Playing raw
-        // OpenAI AAC-as-m4a produced mDataByteSize(0) / silence on watchOS.
+        let ext = fileExtension.isEmpty ? "mp3" : fileExtension
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("reply-\(ts)-\(UUID().uuidString)")
-            .appendingPathExtension("mp3")
+            .appendingPathExtension(ext)
         do {
             try data.write(to: url, options: .atomic)
         } catch {
@@ -358,6 +357,7 @@ extension WatchModel: WCSessionDelegate {
 
         // CRITICAL: read/move before this method returns — WC deletes the inbox
         // file immediately afterward.
+        let ext = file.fileURL.pathExtension.isEmpty ? "mp3" : file.fileURL.pathExtension
         let audioData: Data
         do {
             audioData = try Data(contentsOf: file.fileURL)
@@ -367,7 +367,7 @@ extension WatchModel: WCSessionDelegate {
         guard !audioData.isEmpty else { return }
 
         Task { @MainActor in
-            playReplyAudio(data: audioData, ts: ts)
+            playReplyAudio(data: audioData, ts: ts, fileExtension: ext)
         }
     }
 

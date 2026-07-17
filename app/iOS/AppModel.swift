@@ -4,6 +4,7 @@ import UserNotifications
 import WatchConnectivity
 import Speech
 import Security
+import AVFoundation
 
 enum SpeechLanguage: String, CaseIterable, Identifiable {
     case system
@@ -76,9 +77,153 @@ enum OpenAITTSError: LocalizedError {
         case .missingAPIKey:
             return "Add an OpenAI API key in the Vibe Signal menu"
         case .badStatus(let code, let body):
-            return "OpenAI TTS failed (\(code)): \(body)"
+            if code == 429 {
+                return "OpenAI TTS quota exceeded — using iPhone voice"
+            }
+            return "OpenAI TTS failed (\(code)): \(String(body.prefix(80)))"
         case .emptyAudio:
             return "OpenAI TTS returned empty audio"
+        }
+    }
+}
+
+/// On-device Apple TTS on iPhone (enhanced/premium voices) → CAF for Watch.
+/// No API key / quota. Much better than Watch's built-in synthesizer.
+enum AppleOnDeviceTTS {
+    enum TTSError: LocalizedError {
+        case emptyAudio
+        case writeFailed
+
+        var errorDescription: String? {
+            switch self {
+            case .emptyAudio: return "iPhone TTS produced no audio"
+            case .writeFailed: return "Couldn't write iPhone TTS audio"
+            }
+        }
+    }
+
+    static func synthesizeToFile(_ text: String, languageCode: String) async throws -> URL {
+        var input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { throw TTSError.emptyAudio }
+        if input.count > 1200 {
+            input = String(input.prefix(1200))
+        }
+
+        let renderer = Renderer()
+        return try await renderer.render(input, languageCode: languageCode)
+    }
+
+    private static func preferredVoice(languageCode: String) -> AVSpeechSynthesisVoice? {
+        let voices = AVSpeechSynthesisVoice.speechVoices()
+        let prefix = String(languageCode.prefix(2))
+        let matching = voices.filter {
+            $0.language.replacingOccurrences(of: "_", with: "-")
+                .lowercased()
+                .hasPrefix(prefix.lowercased())
+        }
+        if #available(iOS 17.0, *) {
+            if let premium = matching.first(where: { $0.quality == .premium }) {
+                return premium
+            }
+        }
+        if let enhanced = matching.first(where: { $0.quality == .enhanced }) {
+            return enhanced
+        }
+        let normalized = languageCode.replacingOccurrences(of: "_", with: "-")
+        return AVSpeechSynthesisVoice(language: normalized)
+            ?? AVSpeechSynthesisVoice(language: prefix)
+            ?? matching.first
+    }
+
+    /// Retains synthesizer until write callbacks finish.
+    private final class Renderer: @unchecked Sendable {
+        private let synthesizer = AVSpeechSynthesizer()
+        private let lock = NSLock()
+        private var audioFile: AVAudioFile?
+        private var outputURL: URL?
+        private var continuation: CheckedContinuation<URL, Error>?
+        private var finished = false
+
+        func render(_ text: String, languageCode: String) async throws -> URL {
+            try await withCheckedThrowingContinuation { cont in
+                lock.lock()
+                continuation = cont
+                lock.unlock()
+
+                let url = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("apple-tts-\(UUID().uuidString)")
+                    .appendingPathExtension("caf")
+                outputURL = url
+
+                let utterance = AVSpeechUtterance(string: text)
+                utterance.voice = AppleOnDeviceTTS.preferredVoice(languageCode: languageCode)
+                utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+                utterance.volume = 1.0
+
+                synthesizer.write(utterance) { [weak self] buffer in
+                    guard let self else { return }
+                    guard let pcm = buffer as? AVAudioPCMBuffer else {
+                        self.complete()
+                        return
+                    }
+                    if pcm.frameLength == 0 {
+                        self.complete()
+                        return
+                    }
+                    do {
+                        self.lock.lock()
+                        defer { self.lock.unlock() }
+                        if self.audioFile == nil {
+                            self.audioFile = try AVAudioFile(
+                                forWriting: url,
+                                settings: pcm.format.settings
+                            )
+                        }
+                        try self.audioFile?.write(from: pcm)
+                    } catch {
+                        self.fail(error)
+                    }
+                }
+            }
+        }
+
+        private func complete() {
+            lock.lock()
+            guard !finished else {
+                lock.unlock()
+                return
+            }
+            finished = true
+            let cont = continuation
+            continuation = nil
+            let url = outputURL
+            let wrote = audioFile != nil
+            audioFile = nil
+            lock.unlock()
+
+            guard let cont, let url, wrote else {
+                cont?.resume(throwing: TTSError.emptyAudio)
+                return
+            }
+            // Ensure file is flushed before transfer.
+            cont.resume(returning: url)
+        }
+
+        private func fail(_ error: Error) {
+            lock.lock()
+            guard !finished else {
+                lock.unlock()
+                return
+            }
+            finished = true
+            let cont = continuation
+            continuation = nil
+            if let url = outputURL {
+                try? FileManager.default.removeItem(at: url)
+            }
+            audioFile = nil
+            lock.unlock()
+            cont?.resume(throwing: error)
         }
     }
 }
@@ -230,11 +375,12 @@ final class AppModel: NSObject, ObservableObject {
                 guard let self else { return }
                 let prev = self.snapshot.state
                 self.snapshot = snap
-                let useOpenAITTS = snap.state == .completed && OpenAITTS.hasAPIKey
+                // Always synthesize on iPhone (OpenAI if keyed, else Apple voices).
+                let phoneTTS = snap.state == .completed
                 self.phoneSession.push(
                     state: snap,
                     connected: self.isConnected,
-                    ttsPending: useOpenAITTS
+                    ttsPending: phoneTTS
                 )
                 if prev != snap.state {
                     self.notifyIfNeeded(snap)
@@ -252,7 +398,6 @@ final class AppModel: NSObject, ObservableObject {
                 if let self {
                     let ttsInFlight =
                         self.snapshot.state == .completed
-                        && OpenAITTS.hasAPIKey
                         && self.lastTTSTimestamp == self.snapshot.ts
                     self.phoneSession.push(
                         state: self.snapshot,
@@ -400,37 +545,60 @@ final class AppModel: NSObject, ObservableObject {
         openAIVoice = voice
     }
 
-    /// Generate OpenAI TTS on the phone and ship audio to the Watch for playback.
+    /// Generate TTS on the phone (OpenAI if available, else Apple neural) and ship to Watch.
     private func speakReplyToWatchIfNeeded(_ snap: StateSnapshot) {
         guard snap.state == .completed else { return }
-        guard OpenAITTS.hasAPIKey else { return }
         guard lastTTSTimestamp != snap.ts else { return }
         lastTTSTimestamp = snap.ts
 
         let text = snap.detail.trimmingCharacters(in: .whitespacesAndNewlines)
         let skip = ["Done", "Turn completed", "Waiting for agent", "Listening for agent", "Stopped from Watch"]
         guard !text.isEmpty, !skip.contains(text) else { return }
-        // Ignore our own stop acknowledgements.
         if text.hasPrefix("Stopped") { return }
 
         ttsTask?.cancel()
         let ts = snap.ts
+        let language = speechLanguage.localeIdentifier
         ttsTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let fileURL = try await OpenAITTS.synthesizeToFile(text)
+                let fileURL: URL
+                if OpenAITTS.hasAPIKey {
+                    do {
+                        fileURL = try await OpenAITTS.synthesizeToFile(text)
+                    } catch {
+                        // Quota / network / billing — fall back to on-device Apple voice.
+                        await MainActor.run {
+                            self.lastError = error.localizedDescription
+                        }
+                        fileURL = try await AppleOnDeviceTTS.synthesizeToFile(
+                            text,
+                            languageCode: language
+                        )
+                    }
+                } else {
+                    fileURL = try await AppleOnDeviceTTS.synthesizeToFile(
+                        text,
+                        languageCode: language
+                    )
+                }
                 guard !Task.isCancelled else {
                     try? FileManager.default.removeItem(at: fileURL)
                     return
                 }
                 await MainActor.run {
+                    // Clear transient OpenAI quota noise once Apple TTS succeeded.
+                    if self.lastError?.contains("quota") == true
+                        || self.lastError?.contains("OpenAI TTS") == true {
+                        self.lastError = nil
+                    }
                     self.phoneSession.transferSpeakReply(fileURL: fileURL, stateTs: ts)
                 }
             } catch {
                 await MainActor.run {
                     self.lastError = error.localizedDescription
                     self.phoneSession.notifyWatchSpeechError(
-                        "TTS failed — using Watch voice"
+                        "Phone TTS failed — using Watch voice"
                     )
                     self.phoneSession.push(
                         state: self.snapshot,

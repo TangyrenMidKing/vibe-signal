@@ -131,12 +131,12 @@ struct RootView: View {
                 }
                 Divider()
                 Button(
-                    model.hasOpenAIKey ? "OpenAI API Key ✓" : "OpenAI API Key…",
+                    model.hasOpenAIKey ? "OpenAI TTS (optional) ✓" : "OpenAI TTS (optional)…",
                     systemImage: "key.fill"
                 ) {
                     showOpenAIKey = true
                 }
-                Menu("Watch reply voice", systemImage: "speaker.wave.2.fill") {
+                Menu("OpenAI voice", systemImage: "speaker.wave.2.fill") {
                     ForEach(OpenAIVoice.allCases) { voice in
                         Button {
                             model.setOpenAIVoice(voice)
