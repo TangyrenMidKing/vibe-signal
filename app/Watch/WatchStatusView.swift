@@ -50,7 +50,9 @@ struct WatchStatusView: View {
                     Text(project)
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(PulseTheme.mistSoft)
+                        .multilineTextAlignment(.center)
                         .lineLimit(1)
+                        .frame(maxWidth: .infinity)
                         .padding(.top, 4)
                 }
 
@@ -77,7 +79,7 @@ struct WatchStatusView: View {
                 .tracking(0.8)
                 .foregroundStyle(.white)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -107,6 +109,7 @@ struct WatchStatusView: View {
             Text(model.isReadingReply ? "Tap to stop" : "Stop agent")
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundStyle(PulseTheme.mist)
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
             Button {
