@@ -91,10 +91,25 @@ struct WatchStatusView: View {
                     .tint(PulseTheme.signal(.working))
             }
         default:
-            // completed / error / idle / working: hold-to-talk only.
-            // Voice prompt already continues a paused turn (Stop hook).
-            WatchHoldToTalkButton { url in
-                model.sendVoiceRecording(url)
+            // While a reply is playing, offer Stop; otherwise hold-to-talk.
+            if model.isReadingReply {
+                Button {
+                    model.stopSpeaking()
+                    WKInterfaceDevice.current().play(.click)
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.red.opacity(0.9))
+                .buttonBorderShape(.capsule)
+                .accessibilityLabel("Stop reading")
+            } else {
+                WatchHoldToTalkButton { url in
+                    model.sendVoiceRecording(url)
+                }
             }
         }
     }

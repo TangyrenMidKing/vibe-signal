@@ -24,6 +24,11 @@
 	<string>Hold to speak a response to your coding agent.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Convert your spoken response into text for your coding agent.</string>
+	<!-- Keep reply audio / TTS playing after the screen dims or wrist drops. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>WKRunsIndependentlyOfCompanionApp</key>
 	<false/>
 </dict>

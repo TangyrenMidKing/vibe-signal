@@ -10,6 +10,8 @@ final class WatchModel: NSObject, ObservableObject {
     @Published var phoneConnected = false
     @Published var phoneReachable = false
     @Published var speechError: String?
+    /// True while OpenAI audio or local TTS is playing — UI shows Stop.
+    @Published var isReadingReply = false
 
     private var lastHapticState: AgentState?
     private var lastSpokenResponseTimestamp: Int64?
@@ -17,9 +19,12 @@ final class WatchModel: NSObject, ObservableObject {
     private var session: WCSession?
     private let synthesizer = AVSpeechSynthesizer()
     private var replyPlayer: AVAudioPlayer?
+    /// Keep decoded audio alive for background AVAudioPlayer(data:).
+    private var replyAudioData: Data?
 
     func start() {
         guard WCSession.isSupported() else { return }
+        synthesizer.delegate = self
         let session = WCSession.default
         session.delegate = self
         session.activate()
@@ -118,23 +123,33 @@ final class WatchModel: NSObject, ObservableObject {
         lastSpokenResponseTimestamp = ts
         stopSpeaking()
 
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-            try session.setActive(true)
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.prepareToPlay()
-            player.volume = 1
-            replyPlayer = player
-            guard player.play() else {
-                speakLocal(snapshot.detail, ts: ts)
-                return
-            }
-            WKInterfaceDevice.current().play(.success)
-            speechError = nil
-        } catch {
+        guard let data = try? Data(contentsOf: url), !data.isEmpty else {
             speechError = "Couldn't play reply audio"
             speakLocal(snapshot.detail, ts: ts)
+            return
+        }
+        replyAudioData = data
+
+        activatePlaybackSession { [weak self] in
+            guard let self else { return }
+            do {
+                // data: initializer is more reliable for wrist-down / screen-off playback.
+                let player = try AVAudioPlayer(data: data)
+                player.delegate = self
+                player.prepareToPlay()
+                player.volume = 1
+                self.replyPlayer = player
+                guard player.play() else {
+                    self.speakLocal(self.snapshot.detail, ts: ts)
+                    return
+                }
+                self.isReadingReply = true
+                WKInterfaceDevice.current().play(.success)
+                self.speechError = nil
+            } catch {
+                self.speechError = "Couldn't play reply audio"
+                self.speakLocal(self.snapshot.detail, ts: ts)
+            }
         }
     }
 
@@ -146,6 +161,9 @@ final class WatchModel: NSObject, ObservableObject {
         synthesizer.stopSpeaking(at: .immediate)
         replyPlayer?.stop()
         replyPlayer = nil
+        replyAudioData = nil
+        pendingLocalSpeakTs = nil
+        isReadingReply = false
     }
 
     private func scheduleReplySpeech(detail: String, ts: Int64, preferOpenAI: Bool) {
@@ -172,22 +190,39 @@ final class WatchModel: NSObject, ObservableObject {
             text = String(text.prefix(480)) + "…"
         }
 
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
-            try session.setActive(true)
-        } catch {}
+        activatePlaybackSession { [weak self] in
+            guard let self else { return }
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.replyPlayer?.stop()
+            let utterance = AVSpeechUtterance(string: text)
+            let lang = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
+            utterance.voice =
+                AVSpeechSynthesisVoice(language: lang)
+                ?? AVSpeechSynthesisVoice(language: String(lang.prefix(2)))
+            utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+            utterance.volume = 1.0
+            self.isReadingReply = true
+            self.synthesizer.speak(utterance)
+        }
+    }
 
-        synthesizer.stopSpeaking(at: .immediate)
-        replyPlayer?.stop()
-        let utterance = AVSpeechUtterance(string: text)
-        let lang = Locale.current.identifier.replacingOccurrences(of: "_", with: "-")
-        utterance.voice =
-            AVSpeechSynthesisVoice(language: lang)
-            ?? AVSpeechSynthesisVoice(language: String(lang.prefix(2)))
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.volume = 1.0
-        synthesizer.speak(utterance)
+    /// watchOS suspends the app when the screen dims unless we own an active
+    /// playback session with the Audio background mode enabled.
+    private func activatePlaybackSession(then work: @escaping () -> Void) {
+        let audio = AVAudioSession.sharedInstance()
+        do {
+            try audio.setCategory(.playback, mode: .spokenAudio, options: [])
+        } catch {
+            try? audio.setCategory(.playback, mode: .default, options: [])
+        }
+        audio.activate(options: []) { _, error in
+            Task { @MainActor in
+                if error != nil {
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                }
+                work()
+            }
+        }
     }
 
     private func playHaptic(for state: AgentState) {
@@ -208,6 +243,34 @@ final class WatchModel: NSObject, ObservableObject {
         case .idle:
             break
         }
+    }
+}
+
+extension WatchModel: AVAudioPlayerDelegate {
+    nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        Task { @MainActor in
+            if replyPlayer === player {
+                replyPlayer = nil
+                replyAudioData = nil
+                isReadingReply = false
+            }
+        }
+    }
+}
+
+extension WatchModel: AVSpeechSynthesizerDelegate {
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in isReadingReply = false }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didCancel utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in isReadingReply = false }
     }
 }
 
