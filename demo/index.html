@@ -15,15 +15,144 @@
     .stamp { position:absolute; right:7vw; bottom:11vh; width:clamp(165px,22vw,300px); aspect-ratio:1; border:2px solid var(--orange); color:var(--orange); border-radius:50%; display:grid; place-items:center; text-align:center; font:800 clamp(20px,3vw,42px)/.9 Arial; transform:rotate(11deg); }
     .statement { display:grid; align-content:center; gap:30px; } .statement .line { width:84px; height:9px; background:var(--orange); } .statement p { max-width:590px; font:600 clamp(16px,2vw,23px)/1.35 "Courier New",monospace; }
     .phone-layout { display:grid; grid-template-columns:1.1fr .9fr; align-items:center; gap:7vw; } .phone { width:min(100%,390px); aspect-ratio:.74; border:15px solid var(--ink); border-radius:36px; background:var(--cream); padding:18px; justify-self:end; box-shadow:16px 16px 0 var(--orange); display:grid; grid-template-rows:auto 1fr auto; } .phone-top { display:flex; justify-content:space-between; font:700 10px "Courier New"; } .screen-copy { align-self:center; } .screen-copy strong { display:block; font-size:42px; letter-spacing:-.08em; line-height:.9; } .screen-copy span { display:block; margin-top:15px; font:700 12px/1.4 "Courier New"; } .qr { width:105px; aspect-ratio:1; background:repeating-conic-gradient(#111 0 25%,#eee 0 50%) 50%/20px 20px; border:8px solid #111; justify-self:end; }
-    .chain { display:flex; align-items:center; gap:10px; font:700 13px "Courier New"; flex-wrap:wrap; } .chain span { border:1px solid var(--ink); padding:12px 14px; background:var(--cream); } .chain em { color:var(--orange); font-style:normal; font-size:22px; }
+    .slide:nth-of-type(3) .phone-layout { grid-template-columns:minmax(0,1.25fr) minmax(280px,.75fr); gap:clamp(30px,4vw,58px); }
+    .slide:nth-of-type(3) .phone { width:min(100%,500px); }
+    .signal-flow { margin-top:clamp(30px,5vh,52px); padding:clamp(14px,1.1vw,22px); background:var(--ink); color:var(--cream); box-shadow:clamp(10px,.8vw,16px) clamp(10px,.8vw,16px) 0 var(--orange); width:100%; max-width:980px; }
+    .signal-flow-head { display:flex; justify-content:space-between; align-items:center; padding:4px 5px clamp(14px,1.1vw,22px); font:700 clamp(11px,.78vw,15px)/1 "Courier New",monospace; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); }
+    .signal-flow-head b { color:var(--orange); font-weight:700; }
+    .signal-track { display:grid; grid-template-columns:repeat(4,minmax(0,1fr) clamp(16px,1.25vw,24px)) minmax(0,1fr); align-items:stretch; }
+    .signal-node { min-width:0; min-height:clamp(62px,5.2vw,100px); padding:clamp(13px,1.15vw,22px) 6px; background:rgba(255,255,255,.07); text-align:center; display:grid; gap:clamp(9px,.7vw,14px); align-content:center; }
+    .signal-node small { color:var(--orange); font:700 clamp(9px,.63vw,12px)/1 "Courier New",monospace; letter-spacing:.08em; }
+    .signal-node strong { font:700 clamp(10px,.94vw,18px)/1 "Courier New",monospace; letter-spacing:-.03em; white-space:nowrap; }
+    .signal-arrow { position:relative; min-width:0; }
+    .signal-arrow::before { content:""; position:absolute; left:2px; right:3px; top:50%; height:1px; background:var(--orange); }
+    .signal-arrow::after { content:""; position:absolute; right:1px; top:calc(50% - 3px); width:5px; height:5px; border-top:1px solid var(--orange); border-right:1px solid var(--orange); transform:rotate(45deg); }
     .demo-grid { display:grid; grid-template-columns:1fr 310px; gap:8vw; align-items:center; } .script { max-width:700px; } .script .cue { font:700 12px "Courier New"; letter-spacing:.13em; color:var(--orange); text-transform:uppercase; margin-bottom:20px; } .script p { margin-top:20px; font-size:clamp(17px,2vw,25px); font-weight:600; line-height:1.25; max-width:600px; }
-    .voice-demo { display:grid; grid-template-columns:1.15fr .85fr; grid-template-rows:auto 1fr; column-gap:5vw; row-gap:18px; align-items:start; } .voice-demo .script { grid-column:2; grid-row:1; justify-self:end; max-width:475px; } .voice-demo .script h2 { font-size:clamp(32px,4vw,57px); } .voice-demo .script p { margin-top:13px; font-size:clamp(14px,1.3vw,18px); } .demo-devices { grid-column:1 / -1; grid-row:2; display:flex; align-items:end; justify-content:center; gap:clamp(30px,8vw,130px); padding:0 4vw; } .desktop { width:min(50vw,590px); aspect-ratio:1.58; padding:10px; background:#25272a; border:7px solid #25272a; border-radius:12px 12px 3px 3px; box-shadow:10px 10px 0 rgba(17,19,21,.16); } .desktop-screen { height:100%; background:#141517; color:#e9e5dc; padding:clamp(15px,2vw,25px); font:700 clamp(10px,1.2vw,16px)/1.65 "Courier New"; } .desktop-title { display:block; margin-bottom:16px; color:#f15b2a; } .desktop .cursor { display:inline-block; width:.6em; height:1.05em; vertical-align:-.2em; background:#f15b2a; animation:blink 1s steps(2,end) infinite; } @keyframes blink{50%{opacity:0}} .watch-image { display:block; width:min(100%,310px); height:auto; object-fit:contain; justify-self:center; filter:drop-shadow(12px 12px 0 rgba(17,19,21,.12)); transition:opacity .2s ease; } .voice-demo .watch-image { width:clamp(185px,17vw,250px); margin-bottom:0; }
+    /* Page 4: Desktop | Text / Watch — scales with viewport */
+    .slide:nth-of-type(4) {
+      row-gap: clamp(18px, 2.8vh, 34px);
+    }
+    .live-stage {
+      display: grid;
+      grid-template-columns: minmax(0, 2.4fr) minmax(180px, 1fr);
+      grid-template-rows: minmax(0, auto) minmax(0, 1fr);
+      column-gap: clamp(22px, 3vw, 40px);
+      row-gap: clamp(14px, 2vh, 22px);
+      min-height: 0;
+      height: 100%;
+      align-self: stretch;
+      margin: 0;
+    }
+    .live-stage .panel {
+      min-height: 0;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: 1fr;
+    }
+    .live-stage .panel-body {
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      background: transparent;
+      position: relative;
+    }
+    .live-stage .desktop-panel {
+      grid-column: 1;
+      grid-row: 1 / -1;
+    }
+    .live-stage .text-panel {
+      grid-column: 2;
+      grid-row: 1;
+      background: transparent;
+    }
+    .live-stage .text-panel .panel-body {
+      place-items: start stretch;
+      align-content: start;
+      gap: 10px;
+      padding: clamp(4px, 0.8vw, 10px) 0 0;
+      background: transparent;
+      color: var(--ink);
+    }
+    .live-stage .watch-panel {
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .live-stage .script .cue {
+      font: 700 11px/1.2 "Courier New", monospace;
+      letter-spacing: .12em;
+      color: var(--orange);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .live-stage .script h2 {
+      font-size: clamp(26px, 2.8vw, 44px);
+      line-height: 1;
+      letter-spacing: -.04em;
+      max-width: none;
+    }
+    .live-stage .script p {
+      margin: 0;
+      font: 600 clamp(14px, 1.25vw, 18px)/1.4 "Courier New", monospace;
+      max-width: none;
+    }
+    .live-stage video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: transparent;
+    }
+    .live-stage .watch-panel .panel-body {
+      background: transparent;
+    }
+    .live-stage .watch-panel video {
+      object-fit: contain;
+      object-position: center;
+    }
+    .live-stage .desktop-panel .panel-body,
+    .live-stage .watch-panel .panel-body {
+      padding: 0;
+    }
     .watch { width:270px; aspect-ratio:.83; border:15px solid #303135; border-radius:67px; padding:16px; background:#17181a; box-shadow:12px 12px 0 rgba(17,19,21,.22); justify-self:center; display:grid; place-items:center; } .watch-face { width:100%; height:100%; border-radius:48px; color:white; padding:22px 15px 14px; display:grid; grid-template-rows:auto 1fr auto; text-align:center; transition:.3s; } .watch-dot { width:13px; height:13px; border-radius:50%; background:var(--state); box-shadow:0 0 18px var(--state); margin:auto; } .state-name { margin-top:10px; font:800 20px Arial; letter-spacing:.07em; } .watch-detail { align-self:center; font:700 13px/1.35 "Courier New"; color:rgba(255,255,255,.78); } .watch-action { border:1px solid rgba(255,255,255,.45); border-radius:99px; padding:8px; font:800 11px Arial; } .watch[data-state="idle"] .watch-face { background:#535861; --state:#a6adb7; } .watch[data-state="working"] .watch-face { background:#d94145; --state:#fff; } .watch[data-state="waiting"] .watch-face { background:#e9ad25; --state:#fff; } .watch[data-state="completed"] .watch-face { background:#2dba72; --state:#fff; } .watch[data-state="error"] .watch-face { background:#e8752e; --state:#fff; }
-    .slide:nth-of-type(4) .watch,.slide:nth-of-type(5) .watch { border:0; border-radius:0; padding:0; background:transparent; box-shadow:none; overflow:hidden; background-position:center; background-size:contain; background-repeat:no-repeat; } .slide:nth-of-type(4) .watch { width:clamp(185px,19vw,275px); aspect-ratio:536 / 560; background-image:url('working.png'); } .slide:nth-of-type(5) .watch { width:clamp(200px,22vw,320px); aspect-ratio:536 / 560; background-image:url('idle.png'); } .slide:nth-of-type(4) .watch-face,.slide:nth-of-type(5) .watch-face { opacity:0; } #state-watch[data-state="working"] { background-image:url('working.png'); } #state-watch[data-state="waiting"] { background-image:url('waiting.png'); } #state-watch[data-state="completed"] { background-image:url('completed.png'); } #state-watch[data-state="error"] { background-image:url('error.png'); } .state-capture { display:none; }
+    .slide:nth-of-type(5) .demo-grid { grid-template-columns:minmax(0,1fr) minmax(280px,38vw); gap:clamp(28px,5vw,72px); }
+    .slide:nth-of-type(5) .watch { border:0; border-radius:0; padding:0; background:transparent; box-shadow:none; overflow:hidden; background-position:center; background-size:contain; background-repeat:no-repeat; width:min(38vw,56vh,460px); aspect-ratio:536 / 560; background-image:url('idle.png'); } .slide:nth-of-type(5) .watch-face { opacity:0; } #state-watch[data-state="working"] { background-image:url('working.png'); } #state-watch[data-state="waiting"] { background-image:url('waiting.png'); } #state-watch[data-state="completed"] { background-image:url('completed.png'); } #state-watch[data-state="error"] { background-image:url('error.png'); } .state-capture { display:none; }
     .states { display:grid; grid-template-columns:repeat(5,1fr); gap:9px; align-self:center; } .state-button { appearance:none; border:1px solid var(--line); border-radius:0; background:transparent; padding:12px 8px; color:var(--ink); font:700 11px "Courier New"; cursor:pointer; } .state-button:hover,.state-button.active { background:var(--ink); color:var(--cream); } .state-button i { display:block; width:9px; height:9px; border-radius:50%; background:var(--c); margin:0 auto 8px; }
     .close { align-self:center; display:grid; grid-template-columns:1fr auto; gap:4vw; align-items:end; } .close p { max-width:550px; font:600 clamp(17px,2vw,24px)/1.35 "Courier New"; } .three { color:var(--orange); font:800 clamp(110px,22vw,290px)/.75 Arial; letter-spacing:-.12em; }
-    @media (max-width:700px) { .slide{ padding:25px 23px; } .phone-layout,.demo-grid,.close,.voice-demo{grid-template-columns:1fr;gap:22px}.phone{justify-self:start;width:255px}.stamp{right:24px;bottom:15vh}.watch{width:220px;justify-self:start}.states{grid-template-columns:repeat(3,1fr)}.keys{display:none}.three{justify-self:end}.chain{gap:5px}.chain span{padding:7px}.voice-demo .script{grid-column:1;grid-row:1;justify-self:start}.demo-devices{grid-column:1;grid-row:2;padding:0;gap:15px;justify-content:start}.desktop{width:55vw}.voice-demo .watch-image{width:145px} }
-    @media (max-width:700px) { .slide:nth-of-type(4) .state-capture { left:auto; right:22px; bottom:85px; width:145px; } .slide:nth-of-type(5) .state-capture { right:18px; width:150px; top:60%; } }
+    @media (max-width:900px) {
+      .live-stage {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: minmax(0, 1.4fr) minmax(0, .7fr) minmax(0, .9fr);
+      }
+      .live-stage .desktop-panel { grid-column: 1 / -1; grid-row: 1; }
+      .live-stage .text-panel { grid-column: 1 / -1; grid-row: 2; }
+      .live-stage .watch-panel { grid-column: 1 / -1; grid-row: 3; }
+      .live-stage .script h2 { font-size: clamp(24px, 5vw, 36px); }
+    }
+    @media (max-width:700px) {
+      .slide{ padding:25px 23px; }
+      .phone-layout,.demo-grid,.close{grid-template-columns:1fr;gap:22px}
+      .slide:nth-of-type(3) .phone-layout{grid-template-columns:1fr;gap:22px}
+      .phone{justify-self:start;width:255px}
+      .stamp{right:24px;bottom:15vh}
+      .watch{width:220px;justify-self:start}
+      .states{grid-template-columns:repeat(3,1fr)}
+      .keys{display:none}
+      .three{justify-self:end}
+      .signal-flow{margin-top:18px;padding:7px;box-shadow:5px 5px 0 var(--orange)}
+      .signal-flow-head{padding-bottom:7px}
+      .signal-track{grid-template-columns:repeat(4,minmax(0,1fr) 8px) minmax(0,1fr)}
+      .signal-node{padding:7px 2px}
+      .signal-node strong{font-size:7px}
+      .live-stage { gap: 8px; }
+      .live-stage .script p { font-size: 13px; }
+    }
+    @media (max-width:700px) { .slide:nth-of-type(5) .state-capture { right:18px; width:150px; top:60%; } }
     @media (prefers-reduced-motion:reduce){.slide.active{animation:none}.watch-face,.progress b{transition:none}}
   </style>
 </head>
@@ -31,40 +160,84 @@
   <div class="grain"></div>
   <main class="deck">
     <section class="slide active">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">00:00 / 03:00</span></header>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
       <div class="intro"><h1>Vibe coding<br>should move<br>with <span class="orange">you.</span></h1><p>Vibe Signal brings Codex state, decisions, and controls from the desk to your wrist.</p></div><div class="stamp">UN-TETHER<br>THE VIBE</div>
-      <footer class="bottom"><span>INTRO</span><span class="keys">← → or click to advance</span><span>01 / 06</span></footer>
+      <footer class="bottom"><span>INTRO</span><span>01 / 06</span></footer>
     </section>
     <section class="slide">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">00:20 / 03:00</span></header>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
       <div class="statement"><div class="line"></div><h2>Inspired by the old desk phone: it rings when the work <span class="orange">needs you.</span></h2><p>AI coding should not be held hostage by a USB cable, an editor window, or a desk chair.</p></div>
       <footer class="bottom"><span>BACKGROUND</span><span class="keys">retro hardware, modern autonomy</span><span>02 / 06</span></footer>
     </section>
     <section class="slide">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">00:45 / 03:00</span></header>
-      <div class="phone-layout"><div><h2>One scan.<br>Then your agent can <span class="orange">find you.</span></h2><div class="chain" style="margin-top:34px"><span>CODEX HOOKS</span><em>→</em><span>CONNECTOR</span><em>→</em><span>WEBSOCKET</span><em>→</em><span>WATCH</span></div></div><div class="phone"><div class="phone-top"><span>VIBE SIGNAL</span><span>PAIR</span></div><div class="screen-copy"><strong>SCAN.<br>CONNECT.<br>GO.</strong><span>Same Wi-Fi.<br>Secure token.<br>Live state.</span></div><div class="qr" aria-label="Stylized QR code"></div></div></div>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
+      <div class="phone-layout"><div><h2>One scan.<br>Then your agent can <span class="orange">find you.</span></h2><div class="signal-flow" aria-label="Codex to Connector to WebSocket to iPhone to Watch"><div class="signal-flow-head"><span>Signal path</span><b>Live · LAN</b></div><div class="signal-track"><div class="signal-node"><small>01</small><strong>CODEX</strong></div><i class="signal-arrow" aria-hidden="true"></i><div class="signal-node"><small>02</small><strong>CONNECTOR</strong></div><i class="signal-arrow" aria-hidden="true"></i><div class="signal-node"><small>03</small><strong>WEBSOCKET</strong></div><i class="signal-arrow" aria-hidden="true"></i><div class="signal-node"><small>04</small><strong>IPHONE</strong></div><i class="signal-arrow" aria-hidden="true"></i><div class="signal-node"><small>05</small><strong>WATCH</strong></div></div></div></div><div class="phone"><div class="phone-top"><span>VIBE SIGNAL</span><span>PAIR</span></div><div class="screen-copy"><strong>SCAN.<br>CONNECT.<br>GO.</strong><span>Same Wi-Fi.<br>Secure token.<br>Live state.</span></div><div class="qr" aria-label="Stylized QR code"></div></div></div>
       <footer class="bottom"><span>THE CONNECTOR</span><span class="keys">QR pairs the app to a local WebSocket</span><span>03 / 06</span></footer>
     </section>
     <section class="slide">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">01:00 / 03:00</span></header>
-      <div class="voice-demo"><div class="script"><div class="cue">Live demo 01 · voice coding from Apple Watch</div><h2>Start a task from the place you already <span class="orange">are.</span></h2><p>“Add a compact status indicator to the sidebar.”</p><p>Hold to talk. Release to send. The phone routes your voice prompt to Codex, and the Watch becomes the glanceable status light.</p></div><div class="demo-devices"><div class="desktop"><div class="desktop-screen"><span class="desktop-title">vibe-signal / connector</span><span>&gt; add compact status indicator</span><br><span style="color:#a5a39c">Hook received. Updating sidebar...</span><br><span>&gt; </span><i class="cursor"></i></div></div><div class="watch" data-state="working"><div class="watch-face"><div><div class="watch-dot"></div><div class="state-name">WORKING</div></div><div class="watch-detail">Agent working<br>on your request</div><div class="watch-action">STOP AGENT</div></div></div></div></div>
-      <footer class="bottom"><span>LIVE DEMO</span><span class="keys">1:00 to 2:00 · voice task</span><span>04 / 06</span></footer>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
+      <div class="live-stage" aria-label="Live demo stage">
+        <div class="panel desktop-panel">
+          <div class="panel-body">
+            <video class="demo-video" src="desktop.mp4" muted playsinline preload="auto" title="Desktop demo"></video>
+          </div>
+        </div>
+        <div class="panel text-panel">
+          <div class="panel-body">
+            <div class="script">
+              <div class="cue">Live demo 01 · voice coding from Apple Watch</div>
+              <h2>Describe it. Fix it. <span class="orange">Validate it.</span></h2>
+              <p>“Center all the text in the Apple Watch UI.”</p>
+              <p>Vibe Signal triggers Codex, rebuilds the Watch interface, and confirms the layout is fixed.</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel watch-panel">
+          <div class="panel-body">
+            <video class="demo-video" src="watch.mp4" muted playsinline preload="auto" title="Watch demo"></video>
+          </div>
+        </div>
+      </div>
+      <footer class="bottom"><span>LIVE DEMO</span><span>04 / 06</span></footer>
     </section>
     <section class="slide">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">02:00 / 03:00</span></header>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
       <div class="demo-grid"><div class="script"><div class="cue">Live demo 02 · five signals, one glance</div><h2>Every state has a pulse. <span class="orange">Every pulse has a next move.</span></h2><p>Show the complete state loop: idle, working, waiting for approval, completed, and error. Haptics make the urgent moments felt, not just seen.</p><div class="states" style="margin-top:28px"><button class="state-button active" data-watch-state="idle" style="--c:#a6adb7"><i></i>IDLE</button><button class="state-button" data-watch-state="working" style="--c:#d94145"><i></i>WORKING</button><button class="state-button" data-watch-state="waiting" style="--c:#e9ad25"><i></i>WAITING</button><button class="state-button" data-watch-state="completed" style="--c:#2dba72"><i></i>DONE</button><button class="state-button" data-watch-state="error" style="--c:#e8752e"><i></i>ERROR</button></div></div><div class="watch" id="state-watch" data-state="idle"><div class="watch-face"><div><div class="watch-dot"></div><div class="state-name">IDLE</div></div><div class="watch-detail">Standing by</div><div class="watch-action">HOLD TO TALK</div></div></div></div>
-      <footer class="bottom"><span>LIVE DEMO</span><span class="keys">2:00 to 3:00 · click state buttons</span><span>05 / 06</span></footer>
+      <footer class="bottom"><span>LIVE DEMO</span><span>05 / 06</span></footer>
     </section>
     <section class="slide">
-      <header class="topline"><span class="brand"><i></i> Vibe Signal</span><span class="time">03:00 / 03:00</span></header>
+      <header class="topline"><span class="brand"><i></i> Vibe Signal</span></header>
       <div class="close"><div><h2>Your agent can stay at the desk.<br><span class="orange">You do not have to.</span></h2><p style="margin-top:24px">Vibe Signal turns Codex into an ambient companion: connected on local Wi-Fi, available from your phone, actionable from your wrist.</p></div><div class="three">03<br>MIN</div></div>
       <footer class="bottom"><span>THANK YOU</span><span class="keys">VIBE SIGNAL · CONNECT THE SIGNAL</span><span>06 / 06</span></footer>
     </section>
   </main>
   <script>
     const slides=[...document.querySelectorAll('.slide')], bar=document.createElement('div');bar.className='progress';bar.innerHTML='<b></b>';document.querySelectorAll('.bottom').forEach(x=>x.insertBefore(bar.cloneNode(true),x.children[1]));let current=0;
-    function show(n){current=(n+slides.length)%slides.length;slides.forEach((s,i)=>s.classList.toggle('active',i===current));document.querySelectorAll('.progress b').forEach(b=>b.style.width=`${(current+1)/slides.length*100}%`)}show(0);
-    addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){show(current+1)}if(e.key==='ArrowLeft')show(current-1)});document.querySelector('.deck').addEventListener('click',e=>{if(!e.target.closest('button'))show(current+1)});
+    const demoVideos=[...document.querySelectorAll('.demo-video')];
+    const liveSlideIndex=slides.findIndex(s=>s.querySelector('.live-stage'));
+    function stopDemoVideos(){
+      demoVideos.forEach(v=>{v.pause();v.currentTime=0;});
+    }
+    function playDemoVideosOnce(){
+      demoVideos.forEach(v=>{
+        v.loop=false;
+        v.muted=true;
+        v.currentTime=0;
+        const p=v.play();
+        if(p&&p.catch)p.catch(()=>{});
+        v.onended=()=>{v.pause();};
+      });
+    }
+    function show(n){
+      current=(n+slides.length)%slides.length;
+      slides.forEach((s,i)=>s.classList.toggle('active',i===current));
+      document.querySelectorAll('.progress b').forEach(b=>b.style.width=`${(current+1)/slides.length*100}%`);
+      if(current===liveSlideIndex)playDemoVideosOnce();
+      else stopDemoVideos();
+    }
+    show(0);
+    addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' '){show(current+1)}if(e.key==='ArrowLeft')show(current-1)});
+    document.querySelector('.deck').addEventListener('click',e=>{if(!e.target.closest('button, video, a, .live-stage'))show(current+1)});
     const copy={idle:['IDLE','Standing by','HOLD TO TALK'],working:['WORKING','Agent working','STOP AGENT'],waiting:['WAITING','Needs your approval','APPROVE  ·  DECLINE'],completed:['DONE','Task completed','CONTINUE'],error:['ERROR','Task needs attention','RETRY']};document.querySelectorAll('[data-watch-state]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();let s=btn.dataset.watchState,w=document.querySelector('#state-watch'),[n,d,a]=copy[s];w.dataset.state=s;w.querySelector('.state-name').textContent=n;w.querySelector('.watch-detail').textContent=d;w.querySelector('.watch-action').textContent=a;document.querySelectorAll('[data-watch-state]').forEach(x=>x.classList.toggle('active',x===btn))});
   </script>
 </body>

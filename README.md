@@ -18,6 +18,30 @@ Codex CLI ──hooks──► VS Code Extension (connector)
 
 See [PROTOCOL.md](PROTOCOL.md) for the wire formats.
 
+## How we used Codex and GPT-5.6
+
+### Codex powers the product
+
+Vibe Signal is built directly around the **Codex CLI**. Codex lifecycle hooks such as `SessionStart`, `PostToolUse`, `PermissionRequest`, and `Stop` are translated into a small set of live states that can be understood at a glance. When Codex needs input, Vibe Signal sends the decision back from the iPhone or Apple Watch. Voice prompts can also start or continue a Codex turn, completing the loop from wrist to coding agent.
+
+This is more than a status display: Codex is the active agent behind the experience, while Vibe Signal provides a mobile control and notification layer around it.
+
+### GPT-5.6 helped us build it
+
+We used **GPT-5.6 in Cursor** as an engineering collaborator throughout development. It helped us:
+
+- Design the local-first architecture and shared WebSocket protocol
+- Implement the TypeScript VS Code connector and native SwiftUI apps
+- Debug state synchronization across Codex, iPhone, and Apple Watch
+- Work through iOS background execution, WatchConnectivity, speech, and audio lifecycle issues
+- Create tests, refine the demo flow, and document the project
+
+GPT-5.6 was especially valuable when changes crossed multiple platforms. It could reason about the connector, protocol, and Apple clients together instead of treating each component as an isolated codebase.
+
+## Built with
+
+TypeScript, Node.js, Swift, SwiftUI, iOS, watchOS, Apple Watch, VS Code Extension API, Codex CLI, GPT-5.6, WebSockets, WatchConnectivity, AVFoundation, Speech Recognition, UserNotifications, URLSession, QR pairing, Xcode, and XcodeGen.
+
 ## Repo layout
 
 | Path | Role |
